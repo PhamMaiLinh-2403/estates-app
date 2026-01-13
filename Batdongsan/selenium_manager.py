@@ -87,6 +87,8 @@ def scrape_details_worker(worker_id: int, url_subset: list[str],
                 data = scraper.scrape_listing_details(url)
 
                 if data:
+                    # Add scraping timestamp (Unix epoch seconds)
+                    data['scraping_time'] = int(time.time())
                     data_queue.put(data)
 
             except Exception as e:
