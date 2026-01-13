@@ -2,10 +2,8 @@ import threading
 import signal
 import sys
 import csv
-import pandas as pd
 
 from commons.config import * 
-from database.database_manager import DatabaseManager
 from .selenium_manager import *
 from commons.utils import * 
 
@@ -143,33 +141,3 @@ def scrape_urls_multithreaded():
         print("\nURL collection interrupted by user.")
     else:
         print("\nURL collection completed successfully.")
-
-def scrape_details_multithreaded(db: DatabaseManager, urls_path=URLS_CSV_PATH["Batdongsan"]):
-    """
-    Phase 2: Scrape detailed information for each listing using multiple workers.
-    """
-    global interrupt_count
-    interrupt_count = 0  
-    stop_event.clear()  
-    
-    # Get URLs to scrape
-    urls = pd.read_csv(urls_path).values.tolist()
-    
-    # Apply config limits
-    start_idx = SCRAPING_DETAILS_CONFIG.get("start_index", 0)
-    count = SCRAPING_DETAILS_CONFIG.get("count", 0)
-    
-    if count > 0:
-        urls = urls[start_idx:start_idx + count]
-    else:
-        urls = urls[start_idx:]
-    
-    # Split URLs among workers
-    url_chunks = list(chunks(urls, MAX_WORKERS))
-    print(f"Starting {len(url_chunks)} workers...")
-    
-    threads = []
-    worker_stats = []
-    
-    # Use a lock to safely append stats
-    stats_lock = threading.Lock()

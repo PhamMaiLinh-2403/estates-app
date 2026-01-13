@@ -1,6 +1,4 @@
 import sqlite3
-import json
-import hashlib
 from pathlib import Path
 from datetime import datetime
 from contextlib import contextmanager
@@ -44,5 +42,3 @@ class DatabaseManager:
             cursor.execute(BDS_RAW_LISTINGS_TABLE) 
             cursor.execute(ONEHOUSING_RAW_LISTINGS_TABLE)
             cursor.execute(CLEANED_LISTINGS_TABLE)
-
-    # --- BDS Operations ---

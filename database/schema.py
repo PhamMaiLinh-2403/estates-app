@@ -1,6 +1,5 @@
 BDS_RAW_LISTINGS_TABLE = """
-CREATE TABLE IF NOT EXISTS bds_raw_listings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS bds_raw (
     listing_id TEXT NOT NULL,
     url TEXT NOT NULL,
     title TEXT,
@@ -11,13 +10,13 @@ CREATE TABLE IF NOT EXISTS bds_raw_listings (
     main_info TEXT,
     description TEXT,
     other_info TEXT,
-    image_urls TEXT
+    image_urls TEXT,
+    key TEXT UNIQUE NOT NULL
 )
 """
 
 ONEHOUSING_RAW_LISTINGS_TABLE = """
-CREATE TABLE IF NOT EXISTS onehousing_raw_listings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS onehousing_raw (
     property_id TEXT,
     property_url TEXT NOT NULL,
     listing_title TEXT,
@@ -28,12 +27,13 @@ CREATE TABLE IF NOT EXISTS onehousing_raw_listings (
     alley_width TEXT,
     features TEXT, 
     property_description TEXT,
-    image_url TEXT
+    image_url TEXT,
+    key TEXT UNIQUE NOT NULL
 )
 """
 
 CLEANED_LISTINGS_TABLE = """
-CREATE TABLE IF NOT EXISTS cleaned_listings (
+CREATE TABLE IF NOT EXISTS cleaned (
     ID INTEGER PRIMARY KEY AUTOINCREMENT,
     "Tỉnh/Thành phố" TEXT,
     "Thành phố/Quận/Huyện/Thị xã" TEXT,
@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS cleaned_listings (
     "Yếu tố khác" TEXT,
     "Tọa độ (vĩ độ)" REAL,
     "Tọa độ (kinh độ)" REAL,
-    "Hình ảnh của bài đăng" TEXT
+    "Hình ảnh của bài đăng" TEXT,
+    websites TEXT 
 )
 """

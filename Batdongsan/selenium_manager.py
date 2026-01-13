@@ -25,7 +25,6 @@ def create_stealth_driver(headless: bool = True) -> Driver:
 
     return driver
 
-
 def scrape_urls_worker(worker_id: int, search_page_url: str, start_page: int, 
                        end_page: int, stop_event: threading.Event, 
                        url_queue: queue.Queue) -> None: 
@@ -60,19 +59,11 @@ def scrape_urls_worker(worker_id: int, search_page_url: str, start_page: int,
     finally:
         driver.quit()
 
-
-def scrape_detail_worker(worker_id: int, url_subset: list[str], existing_ids: set[str], 
-                        stop_event: threading.Event, db_manager: DatabaseManager, 
-                        metadata_id: int) -> dict:
+def scrape_details_worker(worker_id: int, url_subset: list[str], 
+                         stop_event: threading.Event, data_queue: queue.Queue):
     """
-    Worker that scrapes listing details and writes to database in batches.
-    Now includes proper error handling and graceful shutdown on CTRL+C.
-    
-    Returns:
-        Dictionary with statistics: {'scraped': X, 'new': Y, 'changed': Z, 'duplicate': W, 'errors': E}
+    Worker that scrapes listing details and pushes them to the queue.
     """
-    stats = {'scraped': 0, 'new': 0, 'changed': 0, 'duplicate': 0, 'errors': 0}
-    
     base = SCRAPING_DETAILS_CONFIG.get("stagger_step_sec", 2.0)
     start_delay = worker_id * base
     print(f"[Worker {worker_id}] Sleeping {start_delay:.1f}s before start.")
@@ -83,12 +74,11 @@ def scrape_detail_worker(worker_id: int, url_subset: list[str], existing_ids: se
         driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
         scraper = Scraper(driver)
         
-        batch_size = SCRAPING_DETAILS_CONFIG.get("batch_size", 10)
-        batch_buffer = []
+        print(f"[Worker {worker_id}] Started. Processing {len(url_subset)} URLs.")
 
         for idx, url in enumerate(url_subset, 1):
             if stop_event.is_set():
-                print(f"[Worker {worker_id}] Stop event detected. Flushing remaining batch...")
+                print(f"[Worker {worker_id}] Stop event detected. Exiting...")
                 break
 
             print(f"[Worker {worker_id}] {idx}/{len(url_subset)} → {url}")
@@ -97,34 +87,11 @@ def scrape_detail_worker(worker_id: int, url_subset: list[str], existing_ids: se
                 data = scraper.scrape_listing_details(url)
 
                 if data:
-                    listing_id = str(data.get("id", "")).replace(".0", "")
-                    
-                    # Skip if already exists in the current session
-                    if listing_id in existing_ids:
-                        print(f"[Worker {worker_id}] Skipping already-scraped ID: {listing_id}")
-                        stats['duplicate'] += 1
-                        continue
-                    
-                    batch_buffer.append(data)
-                    stats['scraped'] += 1
-                    
-                    # Add to existing IDs to prevent duplicates within this session
-                    existing_ids.add(listing_id)
+                    data_queue.put(data)
 
             except Exception as e:
                 print(f"[Worker {worker_id}] Error scraping {url}: {e}")
-                stats['errors'] += 1
                 continue
-
-            # Flush batch to database
-            if len(batch_buffer) >= batch_size:
-                batch_stats = db_manager.insert_raw_listings_batch(batch_buffer, metadata_id)
-                stats['new'] += batch_stats['new']
-                stats['changed'] += batch_stats['changed']
-                stats['duplicate'] += batch_stats['duplicate']
-                
-                print(f"[Worker {worker_id}] Batch saved: {batch_stats}")
-                batch_buffer = []
             
             # Sleep between requests
             if SCRAPING_DETAILS_CONFIG["stagger_mode"] == "random":
@@ -133,39 +100,13 @@ def scrape_detail_worker(worker_id: int, url_subset: list[str], existing_ids: se
                     SCRAPING_DETAILS_CONFIG["stagger_max_sec"],
                 )
                 time.sleep(delay)
-        
-        # Flush remaining items
-        if batch_buffer:
-            batch_stats = db_manager.insert_raw_listings_batch(batch_buffer, metadata_id)
-            stats['new'] += batch_stats['new']
-            stats['changed'] += batch_stats['changed']
-            stats['duplicate'] += batch_stats['duplicate']
-            print(f"[Worker {worker_id}] Final batch saved: {batch_stats}")
 
     except KeyboardInterrupt:
-        print(f"[Worker {worker_id}] Keyboard interrupt received. Saving progress...")
-        if batch_buffer:
-            batch_stats = db_manager.insert_raw_listings_batch(batch_buffer, metadata_id)
-            stats['new'] += batch_stats['new']
-            stats['changed'] += batch_stats['changed']
-            stats['duplicate'] += batch_stats['duplicate']
-        raise
+        print(f"[Worker {worker_id}] Keyboard interrupt received.")
         
     except Exception as e:
         print(f"[Worker {worker_id}] Critical error: {e}")
-        # Try to save whatever is in buffer
-        if batch_buffer:
-            try:
-                batch_stats = db_manager.insert_raw_listings_batch(batch_buffer, metadata_id)
-                stats['new'] += batch_stats['new']
-                stats['changed'] += batch_stats['changed']
-                stats['duplicate'] += batch_stats['duplicate']
-            except Exception as save_error:
-                print(f"[Worker {worker_id}] Failed to save final batch: {save_error}")
         
     finally:
         if driver:
             driver.quit()
-        
-    print(f"[Worker {worker_id}] Final stats: {stats}")
-    return stats
