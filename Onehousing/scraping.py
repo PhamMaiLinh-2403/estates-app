@@ -163,19 +163,13 @@ class OneHousingScraper:
                     break
         
         print(f"[OneHousing] Total URLs scraped: {len(all_urls)}")
-        return list(all_urls)
+        return set(list(all_urls)) 
     
     # ===== STEP 2: SCRAPE DETAILS =====
     
     def extract_listing_details(self, url: str) -> Optional[Dict]:
         """
         Extract detailed information from a single listing page.
-        
-        Args:
-            url: Listing URL
-            
-        Returns:
-            Dictionary with listing details or None if failed
         """
         if self.stop_requested.is_set():
             return None
@@ -290,87 +284,3 @@ class OneHousingScraper:
         except Exception as e:
             print(f"[OneHousing] Unexpected error for {url}: {e}")
             return None
-    
-    def scrape_listing_details_batch(self, urls: List[str], existing_property_ids: set, 
-                                     metadata_id: int, batch_size: int = 10) -> Dict:
-        """
-        Scrape listing details in batches and save to database.
-        
-        Args:
-            urls: List of URLs to scrape
-            existing_property_ids: Set of already scraped property IDs
-            metadata_id: Metadata record ID
-            batch_size: Number of records per batch
-        """
-        stats = {'scraped': 0, 'new': 0, 'changed': 0, 'duplicate': 0, 'errors': 0}
-        
-        batch_buffer = []
-        
-        for idx, url in enumerate(urls, 1):
-            if self.stop_requested.is_set():
-                print("[OneHousing] Stop requested. Saving remaining batch...")
-                break
-            
-            print(f"[OneHousing] {idx}/{len(urls)} → {url}")
-            
-            try:
-                data = self.extract_listing_details(url)
-                
-                if data:
-                    property_id = str(data.get("property_id", "")).strip()
-                    
-                    # Skip if already exists in current session
-                    if property_id and property_id in existing_property_ids:
-                        print(f"[OneHousing] Skipping duplicate ID: {property_id}")
-                        stats['duplicate'] += 1
-                        continue
-                    
-                    batch_buffer.append(data)
-                    stats['scraped'] += 1
-                    
-                    if property_id:
-                        existing_property_ids.add(property_id)
-                
-            except Exception as e:
-                print(f"[OneHousing] Error scraping {url}: {e}")
-                stats['errors'] += 1
-                continue
-            
-            # Save batch to database
-            if len(batch_buffer) >= batch_size:
-                batch_stats = self.db_manager.insert_onehousing_raw_listings_batch(
-                    batch_buffer, metadata_id
-                )
-                stats['new'] += batch_stats['new']
-                stats['changed'] += batch_stats['changed']
-                stats['duplicate'] += batch_stats['duplicate']
-                
-                print(f"[OneHousing] Batch saved: {batch_stats}")
-                batch_buffer = []
-            
-            # Respectful delay
-            delay = random.uniform(
-                SCRAPING_DETAILS_CONFIG["stagger_step_sec"],
-                SCRAPING_DETAILS_CONFIG["stagger_max_sec"]
-            )
-            time.sleep(delay)
-        
-        # Save remaining items
-        if batch_buffer:
-            batch_stats = self.db_manager.insert_onehousing_raw_listings_batch(
-                batch_buffer, metadata_id
-            )
-            stats['new'] += batch_stats['new']
-            stats['changed'] += batch_stats['changed']
-            stats['duplicate'] += batch_stats['duplicate']
-            print(f"[OneHousing] Final batch saved: {batch_stats}")
-        
-        print(f"[OneHousing] Scraping complete. Stats: {stats}")
-        return stats
-    
-    def shutdown(self):
-        """Graceful shutdown."""
-        print("[OneHousing] Shutting down...")
-        self.stop_requested.set()
-        self._close_driver()
-        print("[OneHousing] Shutdown complete.")

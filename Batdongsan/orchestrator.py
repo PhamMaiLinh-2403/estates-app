@@ -2,7 +2,7 @@ import threading
 import signal
 import sys
 import csv
-import queue
+import pandas as pd
 
 from commons.config import * 
 from database.database_manager import DatabaseManager
@@ -48,16 +48,14 @@ def csv_writer_listener(url_queue: queue.Queue, stop_event: threading.Event):
         
         while not stop_event.is_set() or not url_queue.empty():
             try:
-                # Wait for data with a timeout so we can check stop_event occasionally
                 data = url_queue.get(timeout=1.0)
-                
-                # 'None' is the signal that all workers are done
+
                 if data is None:
                     break
                 
                 # Data comes in as a list of URLs from a single page
                 if isinstance(data, list):
-                    buffer.extend([[u] for u in data]) # Format for csv.writer.writerows
+                    buffer.extend([[u] for u in data]) 
                 
                 url_queue.task_done()
 
@@ -80,7 +78,7 @@ def csv_writer_listener(url_queue: queue.Queue, stop_event: threading.Event):
             total_saved += len(buffer)
             print(f"[Writer] Final flush: {len(buffer)}. Total saved: {total_saved}")
 
-def scrape_urls_multithreaded(db_manager: DatabaseManager):
+def scrape_urls_multithreaded():
     """
     Phase 1: Scrape listing URLs from search pages using multiple workers
     and stream results to CSV immediately.
@@ -145,3 +143,33 @@ def scrape_urls_multithreaded(db_manager: DatabaseManager):
         print("\nURL collection interrupted by user.")
     else:
         print("\nURL collection completed successfully.")
+
+def scrape_details_multithreaded(db: DatabaseManager, urls_path=URLS_CSV_PATH["Batdongsan"]):
+    """
+    Phase 2: Scrape detailed information for each listing using multiple workers.
+    """
+    global interrupt_count
+    interrupt_count = 0  
+    stop_event.clear()  
+    
+    # Get URLs to scrape
+    urls = pd.read_csv(urls_path).values.tolist()
+    
+    # Apply config limits
+    start_idx = SCRAPING_DETAILS_CONFIG.get("start_index", 0)
+    count = SCRAPING_DETAILS_CONFIG.get("count", 0)
+    
+    if count > 0:
+        urls = urls[start_idx:start_idx + count]
+    else:
+        urls = urls[start_idx:]
+    
+    # Split URLs among workers
+    url_chunks = list(chunks(urls, MAX_WORKERS))
+    print(f"Starting {len(url_chunks)} workers...")
+    
+    threads = []
+    worker_stats = []
+    
+    # Use a lock to safely append stats
+    stats_lock = threading.Lock()
