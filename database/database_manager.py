@@ -1,4 +1,5 @@
 import sqlite3
+import json
 import hashlib
 from pathlib import Path
 from datetime import datetime
@@ -61,7 +62,18 @@ class DatabaseManager:
         content = '|'.join(hash_fields)
         return hashlib.sha256(content.encode()).hexdigest()
 
-    # --- Raw Listings Operations ---
+    def _compute_onehousing_content_hash(self, data: Dict[str, Any]) -> str:
+        """Compute hash of OneHousing content fields to detect changes."""
+        hash_fields = [
+            str(data.get('listing_title', '')),
+            str(data.get('total_price', '')),
+            str(data.get('features', '')),
+            str(data.get('property_description', '')),
+        ]
+        content = '|'.join(hash_fields)
+        return hashlib.sha256(content.encode()).hexdigest()
+
+    # --- BDS Raw Listings Operations ---
     
     def get_existing_listing_ids(self) -> set:
         """Get all existing listing IDs from the database."""
@@ -168,6 +180,120 @@ class DatabaseManager:
             cursor.execute(f"""
                 SELECT r.* FROM bds_raw_listings r
                 LEFT JOIN cleaned_listings c ON r.listing_id = c.ID
+                WHERE r.status IN ({placeholders}) AND c.ID IS NULL
+                ORDER BY r.scraped_at DESC
+            """, status_filter)
+            
+            columns = [description[0] for description in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+    # --- OneHousing Raw Listings Operations ---
+    
+    def get_existing_onehousing_property_ids(self) -> set:
+        """Get all existing OneHousing property IDs from the database."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT property_id FROM onehousing_raw_listings WHERE property_id IS NOT NULL")
+            return {str(row[0]) for row in cursor.fetchall()}
+    
+    def check_onehousing_listing_status(self, url: str, content_hash: str) -> str:
+        """
+        Check if a OneHousing listing is NEW, DUPLICATE, or CHANGED.
+        
+        Returns:
+            'NEW': URL doesn't exist in database
+            'DUPLICATE': URL exists with same content hash
+            'CHANGED': URL exists but content hash is different
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT content_hash FROM onehousing_raw_listings WHERE property_url = ? ORDER BY scraped_at DESC LIMIT 1",
+                (url,)
+            )
+            result = cursor.fetchone()
+            
+            if result is None:
+                return 'NEW'
+            elif result[0] == content_hash:
+                return 'DUPLICATE'
+            else:
+                return 'CHANGED'
+    
+    def insert_onehousing_raw_listings_batch(self, listings: List[Dict[str, Any]], metadata_id: int) -> Dict[str, int]:
+        """
+        Insert a batch of OneHousing raw listings into the database.
+        
+        Returns:
+            Dictionary with counts: {'new': X, 'duplicate': Y, 'changed': Z}
+        """
+        stats = {'new': 0, 'duplicate': 0, 'changed': 0}
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            for listing in listings:
+                content_hash = self._compute_onehousing_content_hash(listing)
+                status = self.check_onehousing_listing_status(listing['property_url'], content_hash)
+                
+                if status == 'DUPLICATE':
+                    stats['duplicate'] += 1
+                    continue
+                
+                stats[status.lower()] += 1
+                
+                cursor.execute("""
+                    INSERT INTO onehousing_raw_listings 
+                    (property_id, property_url, listing_title, total_price, unit_price, city, district,
+                     alley_width, features, property_description, image_url, content_hash, status, scraped_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    listing.get('property_id'),
+                    listing.get('property_url'),
+                    listing.get('listing_title'),
+                    listing.get('total_price'),
+                    listing.get('unit_price'),
+                    listing.get('city'),
+                    listing.get('district'),
+                    listing.get('alley_width'),
+                    listing.get('features'),
+                    listing.get('property_description'),
+                    listing.get('image_url'),
+                    content_hash,
+                    status,
+                    datetime.now().isoformat()
+                ))
+            
+            # Update metadata with statistics
+            cursor.execute("""
+                UPDATE scraping_metadata 
+                SET status = ?, is_changed = ?
+                WHERE id = ?
+            """, (
+                f"Completed: {stats['new']} new, {stats['changed']} changed, {stats['duplicate']} duplicate",
+                'YES' if stats['changed'] > 0 else 'NO',
+                metadata_id
+            ))
+        
+        return stats
+    
+    def get_onehousing_listings_for_cleaning(self, status_filter: Optional[List[str]] = None) -> List[Dict]:
+        """
+        Get OneHousing raw listings that need to be cleaned.
+        
+        Args:
+            status_filter: List of statuses to filter by (e.g., ['NEW', 'CHANGED'])
+        """
+        if status_filter is None:
+            status_filter = ['NEW', 'CHANGED']
+        
+        placeholders = ','.join('?' * len(status_filter))
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                SELECT r.* FROM onehousing_raw_listings r
+                LEFT JOIN cleaned_listings c ON r.property_id = c.ID
                 WHERE r.status IN ({placeholders}) AND c.ID IS NULL
                 ORDER BY r.scraped_at DESC
             """, status_filter)

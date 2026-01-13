@@ -1,55 +1,19 @@
-import os
 import re
 import pandas as pd
 import numpy as np
+from typing import Dict
 
-from src.config import *
+from commons.config import *
 
 
-class DataCleaner:
+class OneHousingDataCleaner:
     """
-    Cleans and transforms raw scraped property data into a structured format.
-    It loads the raw CSV and image map (optionally), processes the data using a series
-    of extraction functions, and saves the final result to an Excel file.
+    Cleans and transforms raw OneHousing scraped data into standardized format.
     """
 
-    def __init__(self):
-        """Initializes the DataCleaner with paths from the config file."""
-        self.raw_details_path = DETAILS_OUTPUT_PATH
-        self.output_path = CLEANED_DETAILS_OUTPUT_PATH
-        self.df = None
-        self.cleaned_df = None
-
-    def load_data(self):
-        """
-        Loads the raw data and image map (if available), then merges them.
-        Includes deduplication by 'property_id'.
-        """
-        if not os.path.exists(self.raw_details_path):
-            raise FileNotFoundError(f"Raw details file not found: {self.raw_details_path}")
-
-        df = pd.read_csv(self.raw_details_path)
-        df.columns = [
-            "listing_title", "property_id", "total_price", "unit_price",
-            "property_url", "image_url", "city", "district", "alley_width",
-            "features", "property_description"
-        ]
-
-        if not df.empty:
-            df = df.iloc[:-1]  # intentional removal of last row 
-
-        # Deduplicate by 'property_id', keeping the first occurrence
-        initial_rows = len(df)
-        self.df = df.drop_duplicates(subset=['property_id'], keep='first')
-
-        if len(self.df) < initial_rows:
-            print(f"[INFO] Deduplicated {initial_rows - len(self.df)} records by 'property_id'.")
-
-        print(f"[INFO] Loaded and prepared {len(self.df)} records for cleaning.")
-
-    # -- Helper Methods (no changes needed here as they operate on self.df columns) --
     @staticmethod
     def _extract_city(row):
+        """Extract and standardize city name."""
         if pd.notna(row.get("city")):
             return str(row["city"]).replace("TP.", "Thành phố").strip()
 
@@ -60,6 +24,7 @@ class DataCleaner:
 
     @staticmethod
     def _extract_district(row):
+        """Extract and standardize district name."""
         district = row.get("district")
 
         if pd.notna(district):
@@ -81,9 +46,10 @@ class DataCleaner:
 
     @staticmethod
     def _extract_location(df):
+        """Extract ward/commune information."""
         def extract_row(row):
-            full_address = row['listing_title']
-            district = row['district']
+            full_address = row.get('listing_title', '')
+            district = row.get('district', '')
 
             if pd.isna(full_address) or not isinstance(full_address, str) or \
                     pd.isna(district) or not isinstance(district, str):
@@ -127,6 +93,7 @@ class DataCleaner:
 
     @staticmethod
     def _extract_street_name(series: pd.Series) -> pd.Series:
+        """Extract street name from listing title."""
         def extract(text: str):
             if pd.isna(text):
                 return np.nan
@@ -146,16 +113,18 @@ class DataCleaner:
 
     @staticmethod
     def _classify_property_type(title: str) -> str:
+        """Classify property as street-front or alley."""
         if pd.isna(title):
             return ""
 
-        if "cách" in title:
+        if "cách" in str(title).lower():
             return "Mặt ngõ"
 
         return "Mặt phố"
 
     @staticmethod
     def _convert_price_to_numeric(price_str: str) -> float:
+        """Convert price string to numeric value."""
         if pd.isna(price_str):
             return np.nan
 
@@ -173,10 +142,12 @@ class DataCleaner:
 
     @staticmethod
     def _estimate_price(price: float) -> float:
+        """Estimate actual price (98% of listed price)."""
         return round(price * 0.98, 2) if pd.notna(price) else np.nan
 
     @staticmethod
     def _extract_alley_width(row):
+        """Extract minimum alley width."""
         for text in [row.get("alley_width"), row.get("property_description")]:
             if pd.notna(text):
                 if nums := re.findall(r"(\d+(?:\.\d+)?)", str(text)):
@@ -188,6 +159,7 @@ class DataCleaner:
 
     @staticmethod
     def _extract_front_width(row):
+        """Extract front width from features or description."""
         sources = [row.get('features'), row.get('property_description')]
         patterns = [
             r"Hướng mặt tiền\s*:[^;-]+?-\s*(\d+(?:\.\d+)?)\s*m",
@@ -204,7 +176,8 @@ class DataCleaner:
         return np.nan
 
     @staticmethod
-    def _extract_number_of_floors (row):
+    def _extract_number_of_floors(row):
+        """Extract total number of floors."""
         title = str(row.get("listing_title", "")).lower()
         if "đất nền" in title:
             return 0.0
@@ -226,6 +199,7 @@ class DataCleaner:
 
     @staticmethod
     def _extract_land_area(row):
+        """Extract land area."""
         text = str(row.get("features", "")) + " " + str(row.get("property_description", ""))
         patterns = [r"Diện tích:\s*(\d+(?:\.\d+)?)", r"diện tích đất thực tế là\s*([\d.]+)m²"]
 
@@ -240,7 +214,9 @@ class DataCleaner:
 
     @staticmethod
     def _extract_distance_to_main_road(row):
-        desc, title = str(row.get('property_description', '')), str(row.get('listing_title', ''))
+        """Extract distance to main road."""
+        desc = str(row.get('property_description', ''))
+        title = str(row.get('listing_title', ''))
 
         if 'mặt phố' in title.lower():
             return 0
@@ -259,15 +235,11 @@ class DataCleaner:
 
     @staticmethod
     def _extract_number_of_frontages(row):
-        """
-        Parses the property description to find the number of frontages.
-        Defaults to 1 if not explicitly mentioned.
-        """
+        """Extract number of frontages."""
         text = row.get("property_description")
         if pd.isna(text):
             return 1
 
-        # Search for patterns like "2 mặt tiền", "3 mặt tiền", etc.
         match = re.search(r"(\d+)\s*mặt tiền", str(text), re.IGNORECASE)
         if match:
             try:
@@ -275,11 +247,11 @@ class DataCleaner:
             except (ValueError, IndexError):
                 pass
 
-        # If no explicit number is found (e.g., "Nhà mặt tiền"), default to 1.
         return 1
 
     @staticmethod
     def _estimate_remaining_quality(row):
+        """Estimate remaining quality of construction."""
         title = str(row.get("listing_title", "")).lower()
 
         if "đất nền" in title:
@@ -288,6 +260,7 @@ class DataCleaner:
 
     @staticmethod
     def _estimate_construction_price(row):
+        """Estimate construction price per sqm."""
         text = str(row.get("features", "")) + " " + str(row.get("property_description", ""))
         floor = re.search(r"Số tầng:\s*(\d+(?:\.\d+)?)", text, re.IGNORECASE)
         basement = re.search(r"Số tầng hầm:\s*(\d+(?:\.\d+)?)", text, re.IGNORECASE)
@@ -296,87 +269,97 @@ class DataCleaner:
         if "đất nền" in text:
             return ""
 
-        # Safely extract and convert to float, default to 0 if not found
         total_floors += float(floor.group(1)) if floor else 0.0
         total_floors += float(basement.group(1)) if basement else 0.0
 
         if total_floors == 1:
             return 6275876
 
-        # Check if basement existed to apply basement price
-        if basement and float(basement.group(1)) > 0: # Ensure basement was actually found and has floors
+        if basement and float(basement.group(1)) > 0:
             return 9504604
 
-        # Default for multi-floor without specific basement criteria met
-        if total_floors > 1: # Added condition to prevent '8221171' for 'đất nền'
+        if total_floors > 1:
             return 8221171
         
-        return np.nan # For 'đất nền' or cases where no construction price can be estimated
+        return np.nan
 
-    def clean_data(self):
-        """Applies all cleaning and transformation steps to the loaded data."""
-        if self.df is None:
-            self.load_data()
-
-        city = self.df.apply(self._extract_city, axis=1)
-        district = self.df.apply(self._extract_district, axis=1)
-        location = self._extract_location(self.df)
-        street = self._extract_street_name(self.df["listing_title"])
-        prop_type = self.df["listing_title"].apply(self._classify_property_type)
-        price = self.df["total_price"].apply(self._convert_price_to_numeric)
-        est_price = price.apply(self._estimate_price)
-        floors = self.df.apply(self._extract_number_of_floors, axis=1)
-        num_frontages = self.df.apply(self._extract_number_of_frontages, axis=1)
-        area = self.df.apply(self._extract_land_area, axis=1)
-        front_width = self.df.apply(self._extract_front_width, axis=1)
-        remaining_quality = self.df.apply(self._estimate_remaining_quality, axis=1)
-        construction_price = self.df.apply(self._estimate_construction_price, axis=1)
+    @staticmethod
+    def clean_onehousing_data(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply all cleaning transformations to OneHousing raw data.
+        
+        Args:
+            df: DataFrame with raw OneHousing data
+            
+        Returns:
+            Cleaned DataFrame in standardized format
+        """
+        print("[OneHousing] Starting data cleaning...")
+        
+        # Rename property_id to ID for consistency
+        if 'property_id' in df.columns:
+            df = df.copy()
+            df.rename(columns={'property_id': 'ID'}, inplace=True)
+        
+        # Extract and transform all fields
+        city = df.apply(OneHousingDataCleaner._extract_city, axis=1)
+        district = df.apply(OneHousingDataCleaner._extract_district, axis=1)
+        
+        # Temporarily add district column for location extraction
+        df_temp = df.copy()
+        df_temp['district'] = district
+        location = OneHousingDataCleaner._extract_location(df_temp)
+        
+        street = OneHousingDataCleaner._extract_street_name(df["listing_title"])
+        prop_type = df["listing_title"].apply(OneHousingDataCleaner._classify_property_type)
+        price = df["total_price"].apply(OneHousingDataCleaner._convert_price_to_numeric)
+        est_price = price.apply(OneHousingDataCleaner._estimate_price)
+        floors = df.apply(OneHousingDataCleaner._extract_number_of_floors, axis=1)
+        num_frontages = df.apply(OneHousingDataCleaner._extract_number_of_frontages, axis=1)
+        area = df.apply(OneHousingDataCleaner._extract_land_area, axis=1)
+        front_width = df.apply(OneHousingDataCleaner._extract_front_width, axis=1)
+        remaining_quality = df.apply(OneHousingDataCleaner._estimate_remaining_quality, axis=1)
+        construction_price = df.apply(OneHousingDataCleaner._estimate_construction_price, axis=1)
 
         with np.errstate(divide='ignore', invalid='ignore'):
-            # If `floors` is NaN, fill with 1.0, so `total_area` becomes equal to `area`.
-            # If `floors` is 0 (for "Đất nền"), `total_area` correctly becomes 0.
             floors_for_calc = floors.fillna(1.0)
             total_area = round((floors_for_calc * area).replace([np.inf, -np.inf], np.nan), 2)
             length = round((area / front_width).replace([np.inf, -np.inf], np.nan), 2)
 
-        self.cleaned_df = pd.DataFrame({
+        cleaned_df = pd.DataFrame({
+            "ID": df["ID"],
             "Tỉnh/Thành phố": city,
-            "Quận/Huyện/Thị xã": district,
+            "Thành phố/Quận/Huyện/Thị xã": district,
             "Xã/Phường/Thị trấn": location,
             "Đường phố": street,
-            "Địa chỉ chi tiết": prop_type,
-            "Nguồn thông tin": self.df["property_url"],
+            "Chi tiết": prop_type,
+            "Nguồn thông tin": df["property_url"],
             "Tình trạng giao dịch": "Chưa giao dịch",
             "Thời điểm giao dịch/rao bán": pd.NaT,
             "Thông tin liên hệ": "",
             "Giá rao bán/giao dịch": price,
             "Giá ước tính": est_price,
-            "Loại đơn giá (đ/m2 hoặc đ/m ngang)": "đ/m2",
+            "Loại đơn giá (Đ/m2 hoặc Đ/m ngang)": "Đ/m2",
             "Đơn giá đất": "",
+            "Lợi thế kinh doanh": "",
             "Số tầng công trình": floors,
-            "Chất lượng còn lại": remaining_quality,
-            "Giá trị công trình xây dựng": "",
-            "Đơn giá xây dựng": construction_price,
-            "Diện tích đất (m2)": area,
             "Tổng diện tích sàn": total_area,
+            "Đơn giá xây dựng": construction_price,
+            "Năm xây dựng": np.nan,
+            "Chất lượng còn lại": remaining_quality,
+            "Diện tích đất (m2)": area,
             "Kích thước mặt tiền (m)": front_width,
-            "Kích thước chiều dài": length,
+            "Kích thước chiều dài (m)": length,
             "Số mặt tiền tiếp giáp": num_frontages,
             "Hình dạng": "Chữ nhật",
-            "Độ rộng ngõ/ngách nhỏ nhất (m)": self.df.apply(self._extract_alley_width, axis=1),
-            "Khoảng cách tới trục đường chính (m)": self.df.apply(self._extract_distance_to_main_road, axis=1),
+            "Độ rộng ngõ/ngách nhỏ nhất (m)": df.apply(OneHousingDataCleaner._extract_alley_width, axis=1),
+            "Khoảng cách tới trục đường chính (m)": df.apply(OneHousingDataCleaner._extract_distance_to_main_road, axis=1),
             "Mục đích sử dụng đất": "Đất ở",
-            "Hình ảnh của bài đăng": self.df["image_url"],
-            "Yếu tố khác": ""
+            "Yếu tố khác": "",
+            "Tọa độ (vĩ độ)": np.nan,
+            "Tọa độ (kinh độ)": np.nan,
+            "Hình ảnh của bài đăng": df["image_url"]
         })
-        print("[INFO] Data cleaning process completed.")
-
-    def save_cleaned_data(self):
-        """Saves the cleaned DataFrame to an Excel file."""
-        if self.cleaned_df is None:
-            print("[ERROR] No cleaned data to save. Run clean_data() first.")
-            return
-
-        os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
-        self.cleaned_df.to_excel(self.output_path, index=False, engine='openpyxl')
-        print(f"[INFO] Cleaned data saved to {self.output_path}")
+        
+        print("[OneHousing] Data cleaning completed.")
+        return cleaned_df

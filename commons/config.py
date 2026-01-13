@@ -36,6 +36,7 @@ INFO_DATA_DIR = BASE_DIR / "Dữ liệu thông tin kỹ thuật tài sản"
 
 START_PAGE_NUMBER = 1
 END_PAGE_NUMBER = 3000
+TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 
 #  Details configuration 

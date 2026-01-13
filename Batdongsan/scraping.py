@@ -66,7 +66,7 @@ class Scraper:
         all_urls = []
         
         for i in range(start_page_number, end_page_number + 1):
-            current_url = self.build_page_url(search_page_url, i)
+            current_url = Scraper.build_page_url(search_page_url, i)
             
             new_urls = self.scrape_single_page(current_url)
             

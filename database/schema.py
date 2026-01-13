@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS cleaned_listings (
     "Yếu tố khác" TEXT,
     "Tọa độ (vĩ độ)" REAL,
     "Tọa độ (kinh độ)" REAL,
-    "Hình ảnh của bài đăng" TEXT,
+    "Hình ảnh của bài đăng" TEXT
 )
 """
 
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS scraping_metadata (
     scraped_time TIMESTAMP NOT NULL,
     status TEXT NOT NULL,
     is_changed TEXT, 
-    error_message TEXT,
+    error_message TEXT
 )
 """
 

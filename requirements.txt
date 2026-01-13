@@ -1,8 +1,7 @@
 pandas~=2.3.0
 numpy~=2.2.6
 requests~=2.32.3
-bs4~=0.0.2 # này với dưới khác gì nhau
-beautifulsoup4~=4.13.4
+bs4~=0.0.2 
 tqdm~=4.67.1
 fake-useragent~=2.2.0
 selenium~=4.33.0
