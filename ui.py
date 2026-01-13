@@ -15,7 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
 from main import run_scrape_urls,run_scrape_details, run_cleaning_pipeline
-from src.config import *
+from common.config import *
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
