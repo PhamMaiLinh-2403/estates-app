@@ -11,11 +11,7 @@ CREATE TABLE IF NOT EXISTS bds_raw_listings (
     main_info TEXT,
     description TEXT,
     other_info TEXT,
-    image_urls TEXT,
-    content_hash TEXT NOT NULL,
-    status TEXT DEFAULT 'NEW',
-    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(url, content_hash)
+    image_urls TEXT
 )
 """
 
@@ -32,11 +28,7 @@ CREATE TABLE IF NOT EXISTS onehousing_raw_listings (
     alley_width TEXT,
     features TEXT, 
     property_description TEXT,
-    image_url TEXT,
-    content_hash TEXT NOT NULL,
-    status TEXT DEFAULT 'NEW',
-    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(property_url, content_hash)
+    image_url TEXT
 )
 """
 
@@ -76,20 +68,3 @@ CREATE TABLE IF NOT EXISTS cleaned_listings (
     "Hình ảnh của bài đăng" TEXT
 )
 """
-
-METADATA_TABLE = """
-CREATE TABLE IF NOT EXISTS scraping_metadata (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    websites TEXT NOT NULL,
-    scraped_time TIMESTAMP NOT NULL,
-    status TEXT NOT NULL,
-    is_changed TEXT, 
-    error_message TEXT
-)
-"""
-
-INDICES = [
-    "CREATE INDEX IF NOT EXISTS idx_raw_url ON bds_raw_listings(url)",
-    "CREATE INDEX IF NOT EXISTS idx_sec_url ON onehousing_raw_listings(property_url)",
-    "CREATE INDEX IF NOT EXISTS idx_sec_prop_id ON onehousing_raw_listings(property_id)",
-]
