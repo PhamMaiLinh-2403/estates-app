@@ -1,11 +1,13 @@
 import pandas as pd
 import threading
 import signal
-from pathlib import Path
+import sys 
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed 
+import multiprocessing
 
 from commons.config import *
+from commons.utils import * 
 from Batdongsan.selenium_manager import *
 from Onehousing.scraping import OneHousingScraper
 from database.database_manager import DatabaseManager
@@ -13,8 +15,11 @@ from Batdongsan.cleaning import DataCleaner, DataImputer, FeatureEngineer
 from Onehousing.cleaning import OneHousingDataCleaner
 from Batdongsan.address_standardizer import AddressStandardizer
 
+# Global flag for graceful shutdown. Do not touch, you have been warned. 
+stop_event = threading.Event()
+interrupt_count = 0
 
-class ScrapingPipeline:
+class FullPipeline:
     """
     Orchestrates the complete scraping and data processing pipeline for both
     Batdongsan.com.vn and OneHousing.vn websites.
@@ -29,78 +34,68 @@ class ScrapingPipeline:
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
     
-    def _signal_handler(self, signum, frame):
-        """Handle CTRL+C gracefully."""
-        print("Shutdown signal received. Finishing current batch...")
-        self.stop_event.set()
+    def signal_handler(sig, frame):
+        """Handle shutdown gracefully."""
+        global interrupt_count
+        interrupt_count += 1
+        
+        if interrupt_count == 1:
+            print("\nInterrupt received. Stopping workers gracefully...")
+            stop_event.set()
+        else:
+            print("\nForce quit! Some data may be lost.")
+            sys.exit(1)
+
+    signal.signal(signal.SIGINT, signal_handler)
     
     # ===== STEP 1: SCRAPE URLs =====
     
-    def scrape_listing_urls(self, website: str = 'batdongsan', search_page_url: str = None,
+    def scrape_listing_urls(self, website: str = 'batdongsan',
                            start_page: int = START_PAGE_NUMBER, 
                            end_page: int = END_PAGE_NUMBER,
                            num_workers: int = MAX_WORKERS) -> list[str]:
         """
         Scrape listing URLs from pagination pages using multiple workers.
-        
-        Args:
-            website: 'batdongsan' or 'onehousing'
-            search_page_url: Override default search URL
-            start_page: Starting page number
-            end_page: Ending page number
-            num_workers: Number of parallel workers
-            
-        Returns:
-            List of listing URLs
         """
-        print(f"\n{'='*60}")
         print(f"STEP 1: SCRAPING LISTING URLs ({website.upper()})")
-        print(f"{'='*60}")
         print(f"Pages: {start_page} to {end_page}")
-        print(f"Workers: {num_workers}")
-        
-        # Use website-specific URL if not provided
-        if search_page_url is None:
-            if website.lower() == 'batdongsan':
-                search_page_url = SEARCH_PAGE_URL.get('Batdongsan', '')
-            elif website.lower() == 'onehousing':
-                search_page_url = SEARCH_PAGE_URL.get('Onehousing', '')
         
         all_urls = []
         
         if website.lower() == 'batdongsan':
-            # Use multi-threaded approach for Batdongsan
-            pages_per_worker = (end_page - start_page + 1) // num_workers
+            page_ranges = split_page_ranges(start_page, end_page, num_workers)
             
-            with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                futures = []
-                
-                for i in range(num_workers):
-                    worker_start = start_page + (i * pages_per_worker)
-                    worker_end = worker_start + pages_per_worker - 1
-                    
-                    if i == num_workers - 1:
-                        worker_end = end_page
-                    
-                    future = executor.submit(
-                        scrape_urls_worker,
-                        i + 1,
-                        search_page_url,
-                        worker_start,
-                        worker_end,
-                        self.stop_event
-                    )
-                    futures.append(future)
-                
-                for future in as_completed(futures):
-                    try:
-                        urls = future.result()
-                        all_urls.extend(urls)
-                    except Exception as e:
-                        print(f"Worker failed: {e}")
+            manager = multiprocessing.Manager()
+            stop_event = manager.Event()
+
+            try:
+                with ProcessPoolExecutor(max_workers=len(page_ranges)) as pool:
+                    futures = {
+                        pool.submit(
+                            scrape_urls_worker, 
+                            wid, 
+                            r_start, 
+                            r_end, 
+                            stop_event
+                        ): wid
+                        for wid, (r_start, r_end) in enumerate(page_ranges)
+                    }
+
+                    for fut in as_completed(futures):
+                        wid = futures[fut]
+                        try:
+                            urls = fut.result()
+                            if urls:
+                                all_urls.extend(urls)
+                            print(f"[Main] Worker {wid} returned {len(urls)} URLs.")
+                        except Exception as exc:
+                            print(f"[Main] Worker {wid} generated an exception: {exc}")
+
+            except KeyboardInterrupt:
+                print("\n[Main] Interrupted! Stopping workers...")
+                stop_event.set()
         
         elif website.lower() == 'onehousing':
-            # Use OneHousing scraper
             onehousing_scraper = OneHousingScraper(self.db_manager)
             try:
                 all_urls = onehousing_scraper.scrape_listing_urls(start_page, end_page)
@@ -111,10 +106,8 @@ class ScrapingPipeline:
         if all_urls:
             df = pd.DataFrame({'url': all_urls})
             df.drop_duplicates(inplace=True)
-            
-            # Add timestamp and website to filename
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = OUTPUT_DIR / f"listing_urls_{website}_{timestamp}.csv"
+
+            output_file = OUTPUT_DIR / f"listing_urls_{website}.csv"
             df.to_csv(output_file, index=False, encoding='utf-8-sig')
             
             print(f"\n Scraped {len(all_urls)} URLs")
@@ -388,7 +381,7 @@ class ScrapingPipeline:
         )
         
         # Extract property features
-        print("  → Extracting property features...")
+        print("→ Extracting property features...")
         df['Nguồn thông tin'] = 'batdongsan.com.vn'
         df['Tình trạng giao dịch'] = 'Đã rao bán'
         df['Thời điểm giao dịch/rao bán'] = df['main_info'].apply(
@@ -494,7 +487,6 @@ class ScrapingPipeline:
                 if scrape_urls:
                     urls = self.scrape_listing_urls(
                         website=site,
-                        search_page_url=kwargs.get('search_page_url'),
                         start_page=kwargs.get('start_page', START_PAGE_NUMBER),
                         end_page=kwargs.get('end_page', END_PAGE_NUMBER),
                         num_workers=kwargs.get('num_workers', MAX_WORKERS)
@@ -535,7 +527,7 @@ class ScrapingPipeline:
 
 if __name__ == "__main__":
     # Initialize pipeline
-    pipeline = ScrapingPipeline()
+    pipeline = FullPipeline()
     
     # Option 1: Run complete pipeline for both websites
     pipeline.run_complete_pipeline(
@@ -547,16 +539,3 @@ if __name__ == "__main__":
         end_page=10,  # Adjust as needed
         num_workers=4
     )
-    
-    # Option 2: Run for specific website only
-    # pipeline.run_complete_pipeline(
-    #     website='onehousing',
-    #     start_page=1,
-    #     end_page=50,
-    #     num_workers=2
-    # )
-    
-    # Option 3: Run individual steps for specific website
-    # urls = pipeline.scrape_listing_urls(website='batdongsan', start_page=1, end_page=5)
-    # pipeline.scrape_listing_details(website='batdongsan', urls=urls, num_workers=4)
-    # pipeline.clean_and_process_data(website='batdongsan')

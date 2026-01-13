@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS onehousing_raw_listings (
     city TEXT,
     district TEXT,
     alley_width TEXT,
-    features TEXT, -- Stored as JSON
+    features TEXT, 
     property_description TEXT,
     image_url TEXT,
     content_hash TEXT NOT NULL,

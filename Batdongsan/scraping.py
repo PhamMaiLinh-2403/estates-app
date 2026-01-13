@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from commons.config import * 
+from commons.utils import * 
 from commons.retry import retry 
 
 
@@ -19,13 +20,6 @@ class Scraper:
     def __init__(self, driver: WebDriver):
         """Initializes the scraper with a Selenium WebDriver instance."""
         self.driver = driver
-
-    def build_page_url(search_page_url, page_number):
-        """Constructs urls for pagination."""
-        if page_number == 1:
-            return search_page_url
-        base_search_url = search_page_url.rstrip('/')
-        return f"{base_search_url}/p{page_number}"
 
     def scrape_single_page(self, page_url: str) -> list[str]:
         page_urls = []
@@ -66,7 +60,7 @@ class Scraper:
         all_urls = []
         
         for i in range(start_page_number, end_page_number + 1):
-            current_url = Scraper.build_page_url(search_page_url, i)
+            current_url = build_page_url(search_page_url, i)
             
             new_urls = self.scrape_single_page(current_url)
             

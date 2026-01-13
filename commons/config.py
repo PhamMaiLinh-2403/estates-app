@@ -33,6 +33,8 @@ OUTPUT_DIR = BASE_DIR / "output"
 TEMP_OUTPUT_DIR = OUTPUT_DIR / "temp_chunks" 
 ADMIN_DATA_DIR = BASE_DIR / "Dữ liệu địa giới hành chính"
 INFO_DATA_DIR = BASE_DIR / "Dữ liệu thông tin kỹ thuật tài sản"
+URLS_CSV_PATH = {'Batdongsan': OUTPUT_DIR / "batdongsan_listing_urls.csv",
+                 'Onehousing': OUTPUT_DIR / "onehousing_listing_urls.csv"} 
 
 START_PAGE_NUMBER = 1
 END_PAGE_NUMBER = 3000

@@ -1,10 +1,11 @@
 import time 
 import random
 import threading
-from pathlib import Path
+import queue 
 from seleniumbase import Driver
 
 from commons.config import *
+from commons.utils import * 
 from .scraping import Scraper
 from database.database_manager import DatabaseManager
 
@@ -26,28 +27,38 @@ def create_stealth_driver(headless: bool = True) -> Driver:
 
 
 def scrape_urls_worker(worker_id: int, search_page_url: str, start_page: int, 
-                       end_page: int, stop_event: threading.Event) -> list[str]:
+                       end_page: int, stop_event: threading.Event, 
+                       url_queue: queue.Queue) -> None: 
     """
-    Worker to scrape a range of pagination pages.
+    Worker to scrape a range of pagination pages and push results to a queue.
     """
-    time.sleep(worker_id * 2.0)
+    time.sleep(worker_id * 2.0) 
     
     print(f"[Worker {worker_id}] Starting URL scrape for pages {start_page} to {end_page}...")
     
     driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
     scraper = Scraper(driver)
-    found_urls = []
 
     try:
-        found_urls = scraper.scrape_listing_urls(search_page_url, start_page, end_page)
-        print(f"[Worker {worker_id}] Finished. Found {len(found_urls)} URLs.")
-        
+        for i in range(start_page, end_page + 1):
+            if stop_event.is_set():
+                print(f"[Worker {worker_id}] Stop event received. Exiting...")
+                break
+
+            current_url = build_page_url(search_page_url, i)
+            new_urls = scraper.scrape_single_page(current_url)
+            
+            if new_urls:
+                # Push found URLs to the queue
+                url_queue.put(new_urls)
+                print(f"[Worker {worker_id}] Page {i}: Found {len(new_urls)} URLs. Pushed to queue.")
+            else:
+                print(f"[Worker {worker_id}] Page {i}: No URLs found.")
+
     except Exception as e:
         print(f"[Worker {worker_id}] Critical Error: {e}")
     finally:
         driver.quit()
-
-    return found_urls
 
 
 def scrape_detail_worker(worker_id: int, url_subset: list[str], existing_ids: set[str], 
