@@ -16,11 +16,27 @@ SELENIUM_CONFIG = {
 
 # --- SCRAPER SETTINGS ---
 MAX_WORKERS = 4
+MAX_RETRIES = 3
+RETRY_DELAY = 2 # Delay khi bị hỏng connection và retry lại
+SELENIUM_WAIT_TIME = 5 # Delay khi mở web của Selenium để đỡ bị tranh tài nguyên
+
 # Urls configuration
-BASE_URL = "https://batdongsan.com.vn"
-SEARCH_PAGE_URL = f"{BASE_URL}/ban-nha-rieng"
+# BASE_URL = "https://batdongsan.com.vn"
+# SEARCH_PAGE_URL = f"{BASE_URL}/ban-nha-rieng"
+BASE_URL = {'Batdongsan': "https://batdongsan.com.vn",
+            'Onehousing': "https://onehousing.vn"}
+SEARCH_PAGE_URL = {'Batdongsan': f"{BASE_URL['Batdongsan']}/ban-nha-rieng",
+                   'Onehousing': f"{BASE_URL['Onehousing']}/nha-dat-ban?"} 
+BASE_DIR = Path(__file__).parent.parent
+OUTPUT_DIR = BASE_DIR / "output"
+## --- FILE & DIRECTORY PATHS ---
+TEMP_OUTPUT_DIR = OUTPUT_DIR / "temp_chunks" 
+ADMIN_DATA_DIR = BASE_DIR / "Dữ liệu địa giới hành chính"
+INFO_DATA_DIR = BASE_DIR / "Dữ liệu thông tin kỹ thuật tài sản"
+
 START_PAGE_NUMBER = 1
 END_PAGE_NUMBER = 3000
+LOG_LEVEL = "INFO"
 
 #  Details configuration 
 SCRAPING_DETAILS_CONFIG = {
@@ -32,17 +48,11 @@ SCRAPING_DETAILS_CONFIG = {
     "stagger_max_sec": 3.0,
 }
 
-# --- FILE & DIRECTORY PATHS ---
-BASE_DIR = Path(__file__).parent.parent
-OUTPUT_DIR = BASE_DIR / "output"
-TEMP_OUTPUT_DIR = OUTPUT_DIR / "temp_chunks" 
-ADMIN_DATA_DIR = BASE_DIR / "Dữ liệu địa giới hành chính"
-INFO_DATA_DIR = BASE_DIR / "Dữ liệu thông tin kỹ thuật tài sản"
-
-URLS_OUTPUT_FILE = OUTPUT_DIR / "listing_urls.csv"
-DETAILS_OUTPUT_FILE = OUTPUT_DIR / "listing_details.csv"
-DATE_FILE = "date.jsonl"
-CLEANED_DETAILS_OUTPUT_FILE = OUTPUT_DIR / "listing_details_cleaned.xlsx"
+# BATDONGSAN CONFIGURATION
+# URLS_OUTPUT_FILE = OUTPUT_DIR / "listing_urls.csv"
+# DETAILS_OUTPUT_FILE = OUTPUT_DIR / "listing_details.csv"
+# DATE_FILE = "date.jsonl"
+# CLEANED_DETAILS_OUTPUT_FILE = OUTPUT_DIR / "listing_details_cleaned.xlsx"
 
 PROVINCES_SQL_FILE = ADMIN_DATA_DIR / "provinces_20250225_2.sql"
 DISTRICTS_SQL_FILE = ADMIN_DATA_DIR / "districts_20250225_2.sql"
@@ -50,7 +60,7 @@ WARDS_SQL_FILE = ADMIN_DATA_DIR / "wards_20250225_2.sql"
 STREETS_SQL_FILE = ADMIN_DATA_DIR / "streets_20250225_2.sql"
 INFO_FILE = INFO_DATA_DIR / "Dữ liệu thông tin kỹ thuật tài sản.xlsx"
 
-# --- DATA EXTRACTION MAPS ---
+## --- DATA EXTRACTION MAPS ---
 FACADE_COUNT_MAP = [
     (r'\b3\s+mặt\s+tiền\b', 3), (r'\bba\s+mặt\s+tiền\b', 3),
     (r'\blô\s+góc\s+2\s+mặt\s+tiền\b', 2), (r'\b2\s+mặt\s+tiền\b', 2),
