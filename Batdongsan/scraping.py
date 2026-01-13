@@ -1,0 +1,199 @@
+import json
+import re
+
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+
+from commons.config import * 
+from commons.retry import retry 
+
+
+class Scraper:
+    """
+    Scraping data utility functions, using a Selenium WebDriver instance.
+    Optimized for robustness with explicit waits and retries.
+    """
+    def __init__(self, driver: WebDriver):
+        """Initializes the scraper with a Selenium WebDriver instance."""
+        self.driver = driver
+
+    def build_page_url(search_page_url, page_number):
+        """Constructs urls for pagination."""
+        if page_number == 1:
+            return search_page_url
+        base_search_url = search_page_url.rstrip('/')
+        return f"{base_search_url}/p{page_number}"
+
+    def scrape_single_page(self, page_url: str) -> list[str]:
+        page_urls = []
+        print(f"Scraping page: {page_url}")
+
+        try:
+            self.driver.get(page_url)
+
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "a.js__product-link-for-product-id")
+                )
+            )
+
+            links = self.driver.find_elements(
+                By.CSS_SELECTOR, "a.js__product-link-for-product-id"
+            )
+
+            for link in links:
+                href = link.get_attribute("href")
+                if href:
+                    full_url = (
+                        BASE_URL + href if href.startswith("/") else href
+                    )
+                    page_urls.append(full_url)
+
+        except TimeoutException:
+            print(f"No products found on {page_url} (or timeout).")
+        except Exception as e:
+            print(f"Error scraping page {page_url}: {e}")
+        
+        return page_urls
+
+    def scrape_listing_urls(self, search_page_url: str, start_page_number: int, end_page_number: int) -> list[str]:
+        """
+        Iterates through pagination and collects all product URLs.
+        """
+        all_urls = []
+        
+        for i in range(start_page_number, end_page_number + 1):
+            current_url = self.build_page_url(search_page_url, i)
+            
+            new_urls = self.scrape_single_page(current_url)
+            
+            if not new_urls:
+                print(f"No URLs found on page {i}. Stopping early.")
+                break
+                
+            all_urls.extend(new_urls)
+            print(f"Found {len(new_urls)} URLs on page {i}. Total: {len(all_urls)}")
+
+        return all_urls
+    
+    @retry(max_tries=3, delay_seconds=5)
+    def scrape_listing_details(self, url: str) -> dict | None:
+        """
+        Scrapes detailed information from a single property listing page.
+        """
+        try:
+            self.driver.get(url)
+            WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.ID, 'product-detail-web'))
+            )
+            body = self.driver.find_element(By.ID, 'product-detail-web')
+            listing_info = self.driver.find_element(By.XPATH, '//*[@id="product-detail-web"]')
+
+            coordinates = self._scrape_lat_long()
+            listing_id = listing_info.get_attribute("prid")
+
+            listing_data = {
+                "url": url,
+                "title": self._get_text(self.driver, "h1.re__pr-title"),
+                "id": listing_id,
+                "latitude": coordinates.get("latitude"),
+                "longitude": coordinates.get("longitude"),
+                "short_address": self._get_text(self.driver, '.re__pr-short-description'),
+                "address_parts": json.dumps(self._scrape_address_parts(), ensure_ascii=False),
+                "main_info": json.dumps(self._scrape_info_items(body), ensure_ascii=False),
+                "description": self._get_text(body, '.re__detail-content'),
+                "other_info": json.dumps(self._scrape_other_info(body), ensure_ascii=False),
+                "image_urls": json.dumps(self._scrape_og_images(), ensure_ascii=False),
+            }
+
+            return listing_data
+        except (TimeoutException, Exception) as e:
+            print(f"Attempt failed for {url}: {e}")
+            raise e
+        
+    @staticmethod
+    def _get_text(element, selector, by=By.CSS_SELECTOR):
+        """
+        Safely gets text from an element.
+        """
+        try:
+            return element.find_element(by, selector).text.strip()
+        except NoSuchElementException:
+            return None
+
+    def _scrape_lat_long(self) -> dict:
+        """
+        Parse script tags to find and extract latitude and longitude using regex.
+        """
+        latitude, longitude = None, None
+        try:
+            script_tags = self.driver.find_elements(By.TAG_NAME, 'script')
+            target_text = "initListingHistoryLazy"
+
+            for script in script_tags:
+                script_content = script.get_attribute('innerHTML')
+                if script_content and target_text in script_content:
+                    lat_match = re.search(r"latitude:\s*([\d\.]+)", script_content)
+                    lon_match = re.search(r"longitude:\s*([\d\.]+)", script_content)
+
+                    if lat_match:
+                        latitude = float(lat_match.group(1))
+                    if lon_match:
+                        longitude = float(lon_match.group(1))
+                    if latitude is not None and longitude is not None:
+                        break
+        except Exception as e:
+            print(f"Could not parse lat/long from script tags: {e}")
+
+        return {"latitude": latitude, "longitude": longitude}
+
+    def _scrape_info_items(self, body):
+        items_data = []
+        info_items = body.find_elements(By.CSS_SELECTOR, ".re__pr-short-info-item")
+
+        for item in info_items:
+            title = self._get_text(item, ".title")
+            value = self._get_text(item, ".value")
+            ext = self._get_text(item, ".ext")
+            items_data.append({"title": title, "value": value, "ext": ext})
+        return items_data
+
+    def _scrape_other_info(self, body):
+        other_info_dict = {}
+        other_info_items = body.find_elements(By.CSS_SELECTOR, '.re__pr-other-info-display .re__pr-specs-content-item')
+
+        for item in other_info_items:
+            key = self._get_text(item, '.re__pr-specs-content-item-title')
+            value = self._get_text(item, '.re__pr-specs-content-item-value')
+
+            if key and value:
+                other_info_dict[key] = value
+        return other_info_dict
+
+    def _scrape_og_images(self):
+        meta_tags = self.driver.find_elements(By.CSS_SELECTOR, 'meta[property="og:image"]')
+        return [tag.get_attribute("content") for tag in meta_tags if tag.get_attribute("content")]
+
+    def _scrape_address_parts(self):
+        try:
+            # Primary method: Scrape breadcrumbs
+            breadcrumb_items = self.driver.find_elements(By.CSS_SELECTOR, '.re__breadcrumb.js__breadcrumb .re__link-se')
+            if breadcrumb_items:
+                return [item.text.strip() for item in breadcrumb_items if item.text.strip()]
+        except NoSuchElementException:
+            pass
+
+        # Fallback method: Scrape JSON-LD schema
+        script_tags = self.driver.find_elements(By.CSS_SELECTOR, 'script[type="application/ld+json"]')
+        for script_tag in script_tags:
+            try:
+                json_text = script_tag.get_attribute('innerHTML')
+                data = json.loads(json_text)
+                if data.get('@type') == 'BreadcrumbList':
+                    return [item['name'] for item in data.get('itemListElement', []) if 'name' in item]
+            except (json.JSONDecodeError, TypeError):
+                continue
+        return []
