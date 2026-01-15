@@ -1,8 +1,6 @@
 import argparse
-import os
 import pandas as pd
 import numpy as np
-import json
 from datetime import datetime
 
 # --- CONFIG & DB ---
@@ -146,8 +144,8 @@ def run_pipeline():
     print("\n--- PHASE 2: CLEANING & DATABASE SYNC ---")
     db = DatabaseManager()
     standardizer = AddressStandardizer(
-        PROVINCES_SQL_PATH, DISTRICTS_SQL_PATH, 
-        WARDS_SQL_PATH, STREETS_SQL_PATH
+        PROVINCES_SQL_FILE, DISTRICTS_SQL_FILE, 
+        WARDS_SQL_FILE, STREETS_SQL_FILE
     )
 
     # --- Handle Batdongsan ---
@@ -167,19 +165,6 @@ def run_pipeline():
         
         df_oh_clean = process_onehousing_df(standardizer)
         db.insert_cleaned_data(df_oh_clean, "OneHousing") # Deduplicated insertion
-
-    # 3. Final Combined Export (Optional Excel)
-    print("\n--- PHASE 3: FINAL EXPORT ---")
-    with db.get_connection() as conn:
-        combined_df = pd.read_sql_query("SELECT * FROM cleaned", conn)
-    
-    if not combined_df.empty:
-        today = datetime.now().strftime('%d_%m_%Y')
-        output_file = f"output/merged_data_{today}.xlsx"
-        combined_df.to_excel(output_file, index=False)
-        print(f"Exported {len(combined_df)} records to {output_file}")
-    else:
-        print("No cleaned records found in database to export.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Unified Vietnamese Real Estate Pipeline")
