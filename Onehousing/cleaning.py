@@ -327,19 +327,18 @@ class OneHousingDataCleaner:
             length = round((area / front_width).replace([np.inf, -np.inf], np.nan), 2)
 
         cleaned_df = pd.DataFrame({
-            "ID": df["ID"],
             "Tỉnh/Thành phố": city,
             "Thành phố/Quận/Huyện/Thị xã": district,
             "Xã/Phường/Thị trấn": location,
             "Đường phố": street,
             "Chi tiết": prop_type,
             "Nguồn thông tin": df["property_url"],
-            "Tình trạng giao dịch": "Chưa giao dịch",
-            "Thời điểm giao dịch/rao bán": pd.NaT,
+            "Tình trạng giao dịch": "Đang giao dịch",
+            "Thời điểm giao dịch/rao bán": np.nan,
             "Thông tin liên hệ": "",
             "Giá rao bán/giao dịch": price,
             "Giá ước tính": est_price,
-            "Loại đơn giá (Đ/m2 hoặc Đ/m ngang)": "Đ/m2",
+            "Loại đơn giá (đ/m2 hoặc đ/m ngang)": "đ/m2",
             "Đơn giá đất": "",
             "Lợi thế kinh doanh": "",
             "Số tầng công trình": floors,

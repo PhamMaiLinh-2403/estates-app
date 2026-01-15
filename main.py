@@ -1,11 +1,14 @@
 import argparse
 import pandas as pd
 import numpy as np
+import os
+import sqlite3
 from datetime import datetime
 
 # --- CONFIG & DB ---
 from commons.config import *
 from database.database_manager import DatabaseManager
+from database.schema import *
 
 # --- PIPELINE 1: BATDONGSAN ---
 from Batdongsan.orchestrator import (
@@ -32,18 +35,18 @@ FINAL_SCHEMA = {
     "Đường phố": "Đường phố",
     "Chi tiết": "Chi tiết",
     "Nguồn thông tin": "url",
-    "Tình trạng giao dịch": "status_const",
+    "Tình trạng giao dịch": "Tình trạng giao dịch",
     "Thời điểm giao dịch/rao bán": "Thời điểm giao dịch/rao bán",
-    "Thông tin liên hệ": "contact_const",
+    "Thông tin liên hệ": "Thông tin liên hệ",
     "Giá rao bán/giao dịch": "Giá rao bán/giao dịch",
     "Giá ước tính": "Giá ước tính",
-    "Loại đơn giá (đ/m2 hoặc đ/m ngang)": "unit_type_const",
+    "Loại đơn giá (đ/m2 hoặc đ/m ngang)": "Loại đơn giá (đ/m2 hoặc đ/m ngang)",
     "Đơn giá đất": "Đơn giá đất",
     "Lợi thế kinh doanh": "Lợi thế kinh doanh",
     "Số tầng công trình": "Số tầng công trình",
     "Tổng diện tích sàn": "Tổng diện tích sàn",
     "Đơn giá xây dựng": "Đơn giá xây dựng",
-    "Năm xây dựng": "year_const",
+    "Năm xây dựng": "Năm xây dựng",
     "Chất lượng còn lại": "Chất lượng còn lại",
     "Diện tích đất (m2)": "Diện tích đất (m2)",
     "Kích thước mặt tiền (m)": "Kích thước mặt tiền (m)",
@@ -101,16 +104,80 @@ def process_batdongsan_df(standardizer):
     df['Đơn giá đất'] = df.apply(FeatureEngineer.calculate_land_unit_price, axis=1)
 
     # Constants
-    df['status_const'] = 'Đang rao bán'
-    df['contact_const'] = ""
-    df['unit_type_const'] = 'đ/m2'
-    df['year_const'] = np.nan
+    df["Tình trạng giao dịch"] = "Đang rao bán"
+    df["Thông tin liên hệ"] = np.nan
+    df["Loại đơn giá (đ/m2 hoặc đ/m ngang)"] = "đ/m2"
+    df["Năm xây dựng"] = np.nan
 
     # Rename to standardized schema
     bds_final = df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
-    return bds_final[list(FINAL_SCHEMA.keys())]
+    bds_final = bds_final[list(FINAL_SCHEMA.keys())]
 
-def process_onehousing_df(standardizer):
+    # Drop NaN and duplicated values
+    na = [
+        'Tỉnh/Thành phố',
+        'Thành phố/Quận/Huyện/Thị xã',
+        'Xã/Phường/Thị trấn',
+        'Đường phố',
+        'Chi tiết',
+        'Nguồn thông tin', 
+        'Thời điểm giao dịch/rao bán',
+        'Giá rao bán/giao dịch',
+        'Giá ước tính',
+        'Đơn giá đất',
+        'Lợi thế kinh doanh',
+        'Số tầng công trình', 
+        'Tổng diện tích sàn', 
+        'Đơn giá xây dựng',
+        'Chất lượng còn lại',
+        'Diện tích đất (m2)',
+        'Kích thước mặt tiền (m)',
+        'Kích thước chiều dài (m)',
+        'Số mặt tiền tiếp giáp',
+        'Hình dạng',
+        'Độ rộng ngõ/ngách nhỏ nhất (m)',
+        'Khoảng cách tới trục đường chính (m)',
+        'Mục đích sử dụng đất',
+        'Tọa độ (vĩ độ)',
+        'Tọa độ (kinh độ)'
+    ]
+    dup = [
+        'Tỉnh/Thành phố', 
+        'Thành phố/Quận/Huyện/Thị xã', 
+        'Xã/Phường/Thị trấn', 
+        'Đường phố', 
+        'Giá rao bán/giao dịch', 
+        'Giá ước tính', 
+        'Đơn giá đất', 
+        'Lợi thế kinh doanh', 
+        'Số tầng công trình', 
+        'Tổng diện tích sàn', 
+        'Đơn giá xây dựng', 
+        'Chất lượng còn lại', 
+        'Diện tích đất (m2)', 
+        'Kích thước mặt tiền (m)', 
+        'Kích thước chiều dài (m)', 
+        'Số mặt tiền tiếp giáp', 
+        'Hình dạng', 
+        'Độ rộng ngõ/ngách nhỏ nhất (m)', 
+        'Khoảng cách tới trục đường chính (m)', 
+        'Mục đích sử dụng đất'
+    ]
+
+    old_size = bds_final.shape[0]
+    bds_final.drop_duplicates(subset=dup, inplace=True)
+    print(f'Dropped {old_size - bds_final.shape[0]} duplicated rows for Batdongsan.')
+
+    old_size = bds_final.shape[0]  
+    bds_final.dropna(subset=na, inplace=True)
+    bds_final.reset_index(drop=True)
+    print(f'Dropped {old_size - bds_final.shape[0]} NaN rows for Batdongsan.')
+
+    print(f'Final number of rows for Batdongsan: {bds_final.shape[0]}')
+
+    return bds_final
+
+def process_onehousing_df():
     """Cleaning logic for OneHousing CSV data."""
     raw_path = DETAILS_CSV_PATH['Onehousing']
     if not raw_path.exists():
@@ -119,10 +186,10 @@ def process_onehousing_df(standardizer):
     df_raw = pd.read_csv(raw_path)
     df = OhCleaner.clean_onehousing_data(df_raw)
     
-    # Apply standardizer to address columns
-    df['Tỉnh/Thành phố'] = df['Tỉnh/Thành phố'].apply(standardizer.standardize_province)
-    df['Thành phố/Quận/Huyện/Thị xã'] = df.apply(standardizer.standardize_district, axis=1)
-    df['Xã/Phường/Thị trấn'] = df.apply(standardizer.standardize_ward, axis=1)
+    # # Apply standardizer to address columns
+    # df['Tỉnh/Thành phố'] = df['Tỉnh/Thành phố'].apply(standardizer.standardize_province)
+    # df['Thành phố/Quận/Huyện/Thị xã'] = df.apply(standardizer.standardize_district, axis=1)
+    # df['Xã/Phường/Thị trấn'] = df.apply(standardizer.standardize_ward, axis=1)
     
     # Missing coordinates in OH
     if 'latitude' not in df.columns: df['latitude'] = np.nan
@@ -130,33 +197,158 @@ def process_onehousing_df(standardizer):
 
     # Rename to standardized schema
     oh_final = df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
-    return oh_final[list(FINAL_SCHEMA.keys())]
+    oh_final = oh_final[list(FINAL_SCHEMA.keys())]
+
+    # Drop NaN and duplicated values
+    na = [
+        'Tỉnh/Thành phố',
+        'Thành phố/Quận/Huyện/Thị xã',
+        'Xã/Phường/Thị trấn',
+        'Đường phố',
+        'Chi tiết',
+        'Nguồn thông tin', 
+        'Thời điểm giao dịch/rao bán',
+        'Giá rao bán/giao dịch',
+        'Giá ước tính',
+        'Số tầng công trình', 
+        'Tổng diện tích sàn', 
+        'Đơn giá xây dựng',
+        'Chất lượng còn lại',
+        'Diện tích đất (m2)',
+        'Kích thước mặt tiền (m)',
+        'Kích thước chiều dài (m)',
+        'Số mặt tiền tiếp giáp',
+        'Hình dạng',
+        'Độ rộng ngõ/ngách nhỏ nhất (m)',
+        'Khoảng cách tới trục đường chính (m)',
+        'Mục đích sử dụng đất',
+        'Tọa độ (vĩ độ)',
+        'Tọa độ (kinh độ)'
+    ]
+    dup = [
+        'Tỉnh/Thành phố', 
+        'Thành phố/Quận/Huyện/Thị xã', 
+        'Xã/Phường/Thị trấn', 
+        'Đường phố', 
+        'Giá rao bán/giao dịch', 
+        'Giá ước tính', 
+        'Số tầng công trình', 
+        'Tổng diện tích sàn', 
+        'Đơn giá xây dựng', 
+        'Chất lượng còn lại', 
+        'Diện tích đất (m2)', 
+        'Kích thước mặt tiền (m)', 
+        'Kích thước chiều dài (m)', 
+        'Số mặt tiền tiếp giáp', 
+        'Hình dạng', 
+        'Độ rộng ngõ/ngách nhỏ nhất (m)', 
+        'Khoảng cách tới trục đường chính (m)', 
+        'Mục đích sử dụng đất'
+    ]
+
+    old_size = oh_final.shape[0]
+    oh_final.drop_duplicates(subset=dup, inplace=True)
+    oh_final.reset_index(drop=True)
+    print(f'Dropped {old_size - oh_final.shape[0]} duplicated rows for Onehousing.')
+
+    # old_size = oh_final.shape[0]  
+    # oh_final.dropna(subset=na, inplace=True)
+    # print(f'Dropped {old_size - oh_final.shape[0]} NaN rows for Onehousing.')
+
+    print(f'Final number of rows for Onehousing: {oh_final.shape[0]}')
+
+    return oh_final
+
+# def clean():
+#     print("\n--- PHASE 2: CLEANING & DATABASE SYNC ---")
+#     db = DatabaseManager()
+#     standardizer = AddressStandardizer(
+#         PROVINCES_SQL_FILE, DISTRICTS_SQL_FILE, 
+#         WARDS_SQL_FILE, STREETS_SQL_FILE
+#     )
+
+#     # --- Handle Batdongsan ---
+#     bds_csv = DETAILS_CSV_PATH['Batdongsan']
+#     if bds_csv.exists():
+#         df_bds_raw = pd.read_csv(bds_csv)
+#         db.insert_raw_data("bds_raw", df_bds_raw) # Deduplicated insertion
+        
+#         df_bds_clean = process_batdongsan_df(standardizer)
+#         db.insert_cleaned_data(df_bds_clean, "Batdongsan") # Deduplicated insertion
+    
+#     # --- Handle OneHousing ---
+#     oh_csv = DETAILS_CSV_PATH['Onehousing']
+#     if oh_csv.exists():
+#         df_oh_raw = pd.read_csv(oh_csv)
+#         db.insert_raw_data("onehousing_raw", df_oh_raw) # Deduplicated insertion
+        
+#         df_oh_clean = process_onehousing_df(standardizer)
+#         db.insert_cleaned_data(df_oh_clean, "OneHousing") # Deduplicated insertion
+
+def create_db():
+    with sqlite3.connect(DATABASE_DIR) as conn:
+        cursor = conn.cursor()
+
+        print('Creating database tables...')
+        cursor.execute(BDS_RAW_TABLE)
+        cursor.execute(UNIQUE_INDEX_BDS_RAW)
+        cursor.execute(ONEHOUSING_RAW_TABLE)
+        cursor.execute(UNIQUE_INDEX_ONEHOUSING_RAW)
+        cursor.execute(CLEANED_TABLE)
+        cursor.execute(UNIQUE_INDEX_CLEANED)
+
+        conn.commit()
+        print("Finished creating database!")
+
+def add_row_to_table(data_path, table_name):
+    df = pd.read_csv(data_path)
+    cols = list(df.columns)
+    placeholders = ",".join(["?"] * len(cols))
+    quoted_cols = "',".join(f'"{col}"' for col in cols)
+
+    sql_statement = f"""
+    INSERT OR IGNORE INTO {table_name} ({quoted_cols})
+    VALUES ({placeholders})
+    """
+
+    with sqlite3.connect(DATABASE_DIR) as conn:
+        conn.executemany(sql_statement, df.itertuples(index=False, name=None))
+        conn.commit()
 
 def clean():
     print("\n--- PHASE 2: CLEANING & DATABASE SYNC ---")
-    db = DatabaseManager()
-    standardizer = AddressStandardizer(
-        PROVINCES_SQL_FILE, DISTRICTS_SQL_FILE, 
-        WARDS_SQL_FILE, STREETS_SQL_FILE
-    )
+    if not os.path.exists(DATABASE_DIR):
+        create_db()
 
-    # --- Handle Batdongsan ---
-    bds_csv = DETAILS_CSV_PATH['Batdongsan']
-    if bds_csv.exists():
-        df_bds_raw = pd.read_csv(bds_csv)
-        db.insert_raw_data("bds_raw", df_bds_raw) # Deduplicated insertion
+    # Add raw data
+    with sqlite3.connect(DATABASE_DIR) as conn:
+        cursor = conn.cursor()    
+
+        # Add raw data
+        print("Adding raw data...")
+        add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
+        add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
+        print("Finished adding raw data!")
+
+        # Clean data
+        print("Cleaning data...")
+        standardizer = AddressStandardizer(
+            PROVINCES_SQL_FILE, DISTRICTS_SQL_FILE, 
+            WARDS_SQL_FILE, STREETS_SQL_FILE
+        )
+        df_bds_clean = process_batdongsan_df(standardizer=standardizer)
+        df_bds_clean['Web'] = 'Batdongsan'
+        df_oh_clean = process_onehousing_df(standardizer=standardizer)
+        df_oh_clean['Web'] = 'Onehousing'
+
+        df_cleaned = pd.concat([df_bds_clean, df_oh_clean], ignore_index=True)
+        df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
+        add_row_to_table(CLEANED_CSV_PATH, "cleaned")
+        print("Finished cleaning data!")
+
+
         
-        df_bds_clean = process_batdongsan_df(standardizer)
-        db.insert_cleaned_data(df_bds_clean, "Batdongsan") # Deduplicated insertion
-    
-    # --- Handle OneHousing ---
-    oh_csv = DETAILS_CSV_PATH['Onehousing']
-    if oh_csv.exists():
-        df_oh_raw = pd.read_csv(oh_csv)
-        db.insert_raw_data("onehousing_raw", df_oh_raw) # Deduplicated insertion
-        
-        df_oh_clean = process_onehousing_df(standardizer)
-        db.insert_cleaned_data(df_oh_clean, "OneHousing") # Deduplicated insertion
+
 
 def run_pipeline():
     bds_scrape_urls()
