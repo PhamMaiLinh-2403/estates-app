@@ -40,6 +40,9 @@ def csv_url_writer_listener(url_queue: queue.Queue, stop_event: threading.Event)
     total_saved = 0
     print(f"[Writer] URL Writer started. Saving to {output_path}")
 
+    with open(output_path, mode='w') as f:
+        f.write('')
+
     with open(output_path, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         if not file_exists:
@@ -72,6 +75,9 @@ def csv_details_writer_listener(data_queue: queue.Queue, stop_event: threading.E
     output_path = DETAILS_CSV_PATH['Onehousing']
     output_path.parent.mkdir(parents=True, exist_ok=True)
     file_exists = output_path.exists()
+
+    with open(output_path, mode='w') as f:
+        f.write('')
 
     with open(output_path, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = None
