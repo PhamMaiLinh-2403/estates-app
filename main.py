@@ -5,17 +5,28 @@ import numpy as np
 import json
 from datetime import datetime
 
+# --- CONFIG & DB ---
 from commons.config import *
+from database.database_manager import DatabaseManager
 
-from Batdongsan.orchestrator import *
-from Batdongsan.cleaning import * 
+# --- PIPELINE 1: BATDONGSAN ---
+from Batdongsan.orchestrator import (
+    scrape_urls_multithreaded as bds_scrape_urls, 
+    scrape_details_multithreaded as bds_scrape_details
+)
+from Batdongsan.cleaning import DataCleaner as BdsCleaner, DataImputer, FeatureEngineer
 
-from Onehousing.orchestrator import * 
-from Onehousing.cleaning import OneHousingDataCleaner 
+# --- PIPELINE 2: ONEHOUSING ---
+from Onehousing.orchestrator import (
+    scrape_onehousing_urls as oh_scrape_urls, 
+    scrape_onehousing_details as oh_scrape_details
+)
+from Onehousing.cleaning import OneHousingDataCleaner as OhCleaner
 
+# --- SHARED UTILS ---
 from Batdongsan.address_standardizer import AddressStandardizer
 
-# --- DATA SCHEMA (Standardized for both sources) ---
+# --- STANDARDIZED DATA SCHEMA ---
 FINAL_SCHEMA = {
     "Tỉnh/Thành phố": "Tỉnh/Thành phố",
     "Thành phố/Quận/Huyện/Thị xã": "Thành phố/Quận/Huyện/Thị xã",
@@ -50,27 +61,15 @@ FINAL_SCHEMA = {
     "Hình ảnh của bài đăng": "image_urls",
 }
 
-def run_scraping_phase():
-    """Run Phase 1 (URLs) and Phase 2 (Details) for both sources."""
-    print("\n=== STARTING BATDONGSAN PIPELINE ===")
-    scrape_urls_multithreaded()
-    scrape_details_multithreaded()
-
-    print("\n=== STARTING ONEHOUSING PIPELINE ===")
-    scrape_onehousing_urls()
-    scrape_onehousing_details()
-
-def process_batdongsan(standardizer):
-    """Load, clean and standardize Batdongsan raw data."""
+def process_batdongsan_df(standardizer):
+    """Cleaning and Feature Engineering logic for Batdongsan CSV data."""
     raw_path = DETAILS_CSV_PATH['Batdongsan']
     if not raw_path.exists():
-        print("[Warning] Batdongsan details not found.")
         return pd.DataFrame()
 
-    print("[Cleaning] Processing Batdongsan data...")
     df = pd.read_csv(raw_path).drop_duplicates()
     
-    # 1. Extraction & Standardization
+    # Extraction
     df['Tỉnh/Thành phố'] = df.apply(BdsCleaner.extract_city, axis=1).apply(standardizer.standardize_province)
     df['Thành phố/Quận/Huyện/Thị xã'] = df.apply(BdsCleaner.extract_district, axis=1)
     df['Thành phố/Quận/Huyện/Thị xã'] = df.apply(standardizer.standardize_district, axis=1)
@@ -88,7 +87,7 @@ def process_batdongsan(standardizer):
     df['Khoảng cách tới trục đường chính (m)'] = df.apply(BdsCleaner.extract_distance_to_the_main_road, axis=1)
     df['description'] = df['description'].apply(BdsCleaner.clean_description_text)
     
-    # Housing specific
+    # Building Specs
     df['Số tầng công trình'] = df.apply(BdsCleaner.extract_num_floors, axis=1)
     df['Hình dạng'] = df.apply(BdsCleaner.extract_land_shape, axis=1)
     df['Chất lượng còn lại'] = df.apply(BdsCleaner.estimate_remaining_quality, axis=1)
@@ -96,79 +95,104 @@ def process_batdongsan(standardizer):
     df['Mục đích sử dụng đất'] = df.apply(BdsCleaner.extract_land_use, axis=1)
     df['Tổng diện tích sàn'] = df.apply(BdsCleaner.extract_building_area, axis=1)
 
-    # 2. Imputation & Features
+    # Imputation & Features
     df = DataImputer.fill_missing_width(df)
     df['Kích thước chiều dài (m)'] = df.apply(DataImputer.fill_missing_length, axis=1)
     df['Giá ước tính'] = df.apply(FeatureEngineer.calculate_estimated_price, axis=1)
     df['Lợi thế kinh doanh'] = df.apply(FeatureEngineer.calculate_business_advantage, axis=1)
     df['Đơn giá đất'] = df.apply(FeatureEngineer.calculate_land_unit_price, axis=1)
 
-    # 3. Format Constants
+    # Constants
     df['status_const'] = 'Đang rao bán'
     df['contact_const'] = ""
     df['unit_type_const'] = 'đ/m2'
     df['year_const'] = np.nan
 
-    return df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
+    # Rename to standardized schema
+    bds_final = df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
+    return bds_final[list(FINAL_SCHEMA.keys())]
 
-def process_onehousing(standardizer):
-    """Load, clean and standardize OneHousing raw data."""
+def process_onehousing_df(standardizer):
+    """Cleaning logic for OneHousing CSV data."""
     raw_path = DETAILS_CSV_PATH['Onehousing']
     if not raw_path.exists():
-        print("[Warning] OneHousing details not found.")
         return pd.DataFrame()
 
-    print("[Cleaning] Processing OneHousing data...")
     df_raw = pd.read_csv(raw_path)
-    df = OneHousingDataCleaner.clean_onehousing_data(df_raw)
+    df = OhCleaner.clean_onehousing_data(df_raw)
     
-    # Apply Standardizer (Address Mapping)
+    # Apply standardizer to address columns
     df['Tỉnh/Thành phố'] = df['Tỉnh/Thành phố'].apply(standardizer.standardize_province)
     df['Thành phố/Quận/Huyện/Thị xã'] = df.apply(standardizer.standardize_district, axis=1)
     df['Xã/Phường/Thị trấn'] = df.apply(standardizer.standardize_ward, axis=1)
     
-    # Add coordinates if missing from cleaning script logic
+    # Missing coordinates in OH
     if 'latitude' not in df.columns: df['latitude'] = np.nan
     if 'longitude' not in df.columns: df['longitude'] = np.nan
 
-    return df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
+    # Rename to standardized schema
+    oh_final = df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
+    return oh_final[list(FINAL_SCHEMA.keys())]
 
-def run_cleaning_pipeline():
-    """Merge cleaned data from both sources and export to final Excel."""
-    print("\n=== STARTING CLEANING & MERGING ===")
+def run_pipeline():
+    # 1. Scraping Phase
+    print("\n--- PHASE 1: SCRAPING ---")
+    bds_scrape_urls()
+    bds_scrape_details()
+    oh_scrape_urls()
+    oh_scrape_details()
+
+    # 2. Database & Cleaning Initialization
+    print("\n--- PHASE 2: CLEANING & DATABASE SYNC ---")
+    db = DatabaseManager()
     standardizer = AddressStandardizer(
         PROVINCES_SQL_PATH, DISTRICTS_SQL_PATH, 
         WARDS_SQL_PATH, STREETS_SQL_PATH
     )
 
-    df_bds = process_batdongsan(standardizer)
-    df_oh = process_onehousing(standardizer)
-
-    # Merge
-    combined_df = pd.concat([df_bds, df_oh], ignore_index=True)
+    # --- Handle Batdongsan ---
+    bds_csv = DETAILS_CSV_PATH['Batdongsan']
+    if bds_csv.exists():
+        df_bds_raw = pd.read_csv(bds_csv)
+        db.insert_raw_data("bds_raw", df_bds_raw) # Deduplicated insertion
+        
+        df_bds_clean = process_batdongsan_df(standardizer)
+        db.insert_cleaned_data(df_bds_clean, "Batdongsan") # Deduplicated insertion
     
-    # Filter columns to schema
-    combined_df = combined_df[list(FINAL_SCHEMA.keys())]
+    # --- Handle OneHousing ---
+    oh_csv = DETAILS_CSV_PATH['Onehousing']
+    if oh_csv.exists():
+        df_oh_raw = pd.read_csv(oh_csv)
+        db.insert_raw_data("onehousing_raw", df_oh_raw) # Deduplicated insertion
+        
+        df_oh_clean = process_onehousing_df(standardizer)
+        db.insert_cleaned_data(df_oh_clean, "OneHousing") # Deduplicated insertion
 
-    # Drop duplicates across sources
-    combined_df.drop_duplicates(subset=['Tỉnh/Thành phố', 'Thành phố/Quận/Huyện/Thị xã', 'Đường phố', 'Giá rao bán/giao dịch', 'Diện tích đất (m2)'], inplace=True)
-
-    # Save Output
-    today = datetime.now().strftime('%d.%m.%Y')
-    output_filename = f"output/standardized_realestate_{today}.xlsx"
-    combined_df.to_excel(output_filename, index=False)
+    # 3. Final Combined Export (Optional Excel)
+    print("\n--- PHASE 3: FINAL EXPORT ---")
+    with db.get_connection() as conn:
+        combined_df = pd.read_sql_query("SELECT * FROM cleaned", conn)
     
-    print(f"Final dataset exported: {output_filename} ({len(combined_df)} records)")
+    if not combined_df.empty:
+        today = datetime.now().strftime('%d_%m_%Y')
+        output_file = f"output/merged_data_{today}.xlsx"
+        combined_df.to_excel(output_file, index=False)
+        print(f"Exported {len(combined_df)} records to {output_file}")
+    else:
+        print("No cleaned records found in database to export.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Unified Real Estate Scraper & Cleaner")
-    parser.add_argument("--mode", choices=["scrape", "clean", "full"], required=True)
+    parser = argparse.ArgumentParser(description="Unified Vietnamese Real Estate Pipeline")
+    parser.add_argument("--mode", choices=["full", "scrape", "clean"], default="full")
     args = parser.parse_args()
 
-    if args.mode == "scrape":
-        run_scraping_phase()
+    if args.mode == "full":
+        run_pipeline()
+    elif args.mode == "scrape":
+        bds_scrape_urls()
+        bds_scrape_details()
+        oh_scrape_urls()
+        oh_scrape_details()
     elif args.mode == "clean":
-        run_cleaning_pipeline()
-    elif args.mode == "full":
-        run_scraping_phase()
-        run_cleaning_pipeline()
+        # Note: Database insertion logic is part of run_pipeline/clean mode
+        run_pipeline() # Simplified for this structure
