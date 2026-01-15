@@ -132,15 +132,7 @@ def process_onehousing_df(standardizer):
     oh_final = df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
     return oh_final[list(FINAL_SCHEMA.keys())]
 
-def run_pipeline():
-    # 1. Scraping Phase
-    print("\n--- PHASE 1: SCRAPING ---")
-    bds_scrape_urls()
-    bds_scrape_details()
-    oh_scrape_urls()
-    oh_scrape_details()
-
-    # 2. Database & Cleaning Initialization
+def clean():
     print("\n--- PHASE 2: CLEANING & DATABASE SYNC ---")
     db = DatabaseManager()
     standardizer = AddressStandardizer(
@@ -166,6 +158,13 @@ def run_pipeline():
         df_oh_clean = process_onehousing_df(standardizer)
         db.insert_cleaned_data(df_oh_clean, "OneHousing") # Deduplicated insertion
 
+def run_pipeline():
+    bds_scrape_urls()
+    bds_scrape_details()
+    oh_scrape_urls()
+    oh_scrape_details()
+    clean()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Unified Vietnamese Real Estate Pipeline")
     parser.add_argument("--mode", choices=["full", "scrape", "clean"], default="full")
@@ -180,4 +179,4 @@ if __name__ == "__main__":
         oh_scrape_details()
     elif args.mode == "clean":
         # Note: Database insertion logic is part of run_pipeline/clean mode
-        run_pipeline() # Simplified for this structure
+        clean() # Simplified for this structure
