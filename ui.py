@@ -17,6 +17,7 @@ import pytz
 import sqlite3
 from main import run_scrape_urls,run_scrape_details, run_cleaning_pipeline
 from src.config import *
+from main import run_pipeline
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -154,33 +155,52 @@ def weekly_pipeline():
     with scrape_lock:
         if scrape_state["running"]:
             return
-
-        scrape_state["running"] = True
+        
+        scrape_state["running"] == True
         scrape_state["message"] = "Scraping started"
 
-    try:
-        # Step 1: scrape links
-        scrape_state["message"] = "Scraping links..."
-        run_scrape_urls()
+        try:
+            run_pipeline()
+            scrape_state['last_run'] = datetime.now().isoformat()
+            scrape_state['message'] = "Pipeline completed successfully"
+        except Exception as e:
+            scrape_state["message"] = "Pipeline failed"
+            print(f'Pipeline stopped with error: {e}')
+            traceback.print_exc()
+        finally:
+            scrape_state["running"] = False
 
-        # Step 2: scrape details from link
-        scrape_state["message"] = "Scraping details..."
-        run_scrape_details()
+# def weekly_pipeline():
+#     with scrape_lock:
+#         if scrape_state["running"]:
+#             return
 
-        # Step 3: clean data
-        scrape_state["message"] = "Cleaning data..."
-        run_cleaning_pipeline(mode="house")
+#         scrape_state["running"] = True
+#         scrape_state["message"] = "Scraping started"
 
-        scrape_state["last_run"] = datetime.now().isoformat()
-        scrape_state["message"] = "Pipeline completed successfully"
+#     try:
+#         # Step 1: scrape links
+#         scrape_state["message"] = "Scraping links..."
+#         run_scrape_urls()
 
-    except Exception as e:
-        scrape_state["message"] = "Pipeline failed"
-        scrape_state["error"] = str(e)
-        traceback.print_exc()
+#         # Step 2: scrape details from link
+#         scrape_state["message"] = "Scraping details..."
+#         run_scrape_details()
 
-    finally:
-        scrape_state["running"] = False
+#         # Step 3: clean data
+#         scrape_state["message"] = "Cleaning data..."
+#         run_cleaning_pipeline(mode="house")
+
+#         scrape_state["last_run"] = datetime.now().isoformat()
+#         scrape_state["message"] = "Pipeline completed successfully"
+
+#     except Exception as e:
+#         scrape_state["message"] = "Pipeline failed"
+#         scrape_state["error"] = str(e)
+#         traceback.print_exc()
+
+#     finally:
+#         scrape_state["running"] = False
 
 scheduler = BackgroundScheduler(timezone="Asia/Ho_Chi_Minh")
 scheduler.add_job(
