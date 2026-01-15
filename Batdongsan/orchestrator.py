@@ -42,6 +42,9 @@ def csv_writer_listener(url_queue: queue.Queue, stop_event: threading.Event):
     
     print(f"[Writer] Started. Saving to {URLS_CSV_PATH['Batdongsan']}")
 
+    with open(URLS_CSV_PATH['Batdongsan'], mode='w') as f:
+        f.write('')
+
     with open(URLS_CSV_PATH['Batdongsan'], mode='a', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         if not file_exists:
@@ -94,6 +97,9 @@ def csv_details_writer_listener(data_queue: queue.Queue, stop_event: threading.E
     
     file_exists = details_output_path.exists()
     print(f"[Writer] Started. Saving details to {details_output_path}")
+
+    with open(details_output_path, mode='w') as f:
+        f.write('')
 
     with open(details_output_path, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = None
