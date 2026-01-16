@@ -302,9 +302,16 @@ def create_db():
 
 def add_row_to_table(data_path, table_name):
     df = pd.read_csv(data_path)
+    try:
+        df.drop(columns='scraping_time', inplace=True)
+    except:
+        pass
     cols = list(df.columns)
-    placeholders = ",".join(["?"] * len(cols))
-    quoted_cols = "',".join(f'"{col}"' for col in cols)
+    print(cols)
+    placeholders = ",".join(["?"] * (len(cols)))
+    quoted_cols = ",".join(f'"{col}"' for col in cols)
+    print(f'Placeholders: {placeholders}')
+    print(f'Quoted columns: {quoted_cols}')
 
     sql_statement = f"""
     INSERT OR IGNORE INTO {table_name} ({quoted_cols})
@@ -338,7 +345,7 @@ def clean():
         )
         df_bds_clean = process_batdongsan_df(standardizer=standardizer)
         df_bds_clean['Web'] = 'Batdongsan'
-        df_oh_clean = process_onehousing_df(standardizer=standardizer)
+        df_oh_clean = process_onehousing_df()
         df_oh_clean['Web'] = 'Onehousing'
 
         df_cleaned = pd.concat([df_bds_clean, df_oh_clean], ignore_index=True)

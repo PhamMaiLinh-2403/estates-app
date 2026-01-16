@@ -73,7 +73,7 @@
 # NEW CREATE TABLE STATEMENT
 BDS_RAW_TABLE = """
     CREATE TABLE IF NOT EXISTS bds_raw(
-    listing_id TEXT NOT NULL,
+    id TEXT NOT NULL,
     url TEXT NOT NULL,
     title TEXT,
     short_address TEXT,
@@ -83,13 +83,14 @@ BDS_RAW_TABLE = """
     main_info TEXT,
     description TEXT,
     other_info TEXT,
-    image_urls TEXT
+    image_urls TEXT,
+    scraping_time 
     );
     """
 UNIQUE_INDEX_BDS_RAW = """
     CREATE UNIQUE INDEX IF NOT EXISTS unique_index
     ON bds_raw(
-    listing_id,
+    id,
     url,
     title,
     short_address,
