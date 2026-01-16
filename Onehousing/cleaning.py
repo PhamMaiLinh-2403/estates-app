@@ -14,13 +14,22 @@ class OneHousingDataCleaner:
     @staticmethod
     def _extract_city(row):
         """Extract and standardize city name."""
-        if pd.notna(row.get("city")):
-            return str(row["city"]).replace("TP.", "Thành phố").strip()
+        city = row.get('city')
+        if pd.notna(city):
+           return str(row["city"]).replace("TP.", "Thành phố").replace('T.', 'Tỉnh').strip()
+        else:
+            city = row.get('listing_title', '')
+            try:
+                return city.split(',')[-1].replace('TP.', 'Thành phố').replace('T.', 'Tỉnh').strip()
+            except:
+                return np.nan
+        # if pd.notna(row.get("city")):
+        #     return str(row["city"]).replace("TP.", "Thành phố").strip()
 
-        title = str(row.get("listing_title", ""))
-        match = re.search(r"(TP\.|Thành phố)\s*([^.,\n]+)", title, re.IGNORECASE)
+        # title = str(row.get("listing_title", ""))
+        # match = re.search(r"(TP\.|Thành phố)\s*([^.,\n]+)", title, re.IGNORECASE)
 
-        return f"Thành phố {match.group(2).strip()}" if match else np.nan
+        # return f"Thành phố {match.group(2).strip()}" if match else np.nan
 
     @staticmethod
     def _extract_district(row):
@@ -30,19 +39,29 @@ class OneHousingDataCleaner:
         if pd.notna(district):
             return str(district).replace("Q.", "Quận").replace("H.", "Huyện").replace("TX.", "Thị xã").strip()
 
-        title = str(row.get("listing_title", ""))
-        match = re.search(r"\b(Q\.|H\.|TX\.)\s*([^.,\n]+)", title, re.IGNORECASE)
-
-        if match:
-            prefix, name = match.group(1).upper(), match.group(2).strip()
-            if prefix == "Q.":
-                return f"Quận {name}"
-            if prefix == "H.":
-                return f"Huyện {name}"
-            if prefix == "TX.":
-                return f"Thị xã {name}"
-
+        title = row.get('listing_title', '')
+        if pd.notna(title):
+            return title.split(",")[-2].replace('TP.').replace('Q.', "Quận").replace('H.', "Huyện").replace('TX.', 'Thị xã').strip()
         return np.nan
+    
+        # district = row.get("district")
+
+        # if pd.notna(district):
+        #     return str(district).replace("Q.", "Quận").replace("H.", "Huyện").replace("TX.", "Thị xã").strip()
+
+        # title = str(row.get("listing_title", ""))
+        # match = re.search(r"\b(Q\.|H\.|TX\.)\s*([^.,\n]+)", title, re.IGNORECASE)
+
+        # if match:
+        #     prefix, name = match.group(1).upper(), match.group(2).strip()
+        #     if prefix == "Q.":
+        #         return f"Quận {name}"
+        #     if prefix == "H.":
+        #         return f"Huyện {name}"
+        #     if prefix == "TX.":
+        #         return f"Thị xã {name}"
+
+        # return np.nan
 
     @staticmethod
     def _extract_ward(df):
@@ -364,6 +383,61 @@ class OneHousingDataCleaner:
             "Tọa độ (kinh độ)": np.nan,
             "Hình ảnh của bài đăng": df["image_url"]
         })
+
+        # Drop NaN values
+        na = [
+            'Tỉnh/Thành phố',
+            'Thành phố/Quận/Huyện/Thị xã',
+            'Xã/Phường/Thị trấn',
+            'Đường phố',
+            'Chi tiết',
+            'Nguồn thông tin', 
+            # 'Thời điểm giao dịch/rao bán',
+            'Giá rao bán/giao dịch',
+            'Giá ước tính',
+            # 'Đơn giá đất',
+            # 'Lợi thế kinh doanh',
+            'Số tầng công trình', 
+            'Tổng diện tích sàn', 
+            'Đơn giá xây dựng',
+            'Chất lượng còn lại',
+            'Diện tích đất (m2)',
+            'Kích thước mặt tiền (m)',
+            'Kích thước chiều dài (m)',
+            'Số mặt tiền tiếp giáp',
+            'Hình dạng',
+            'Độ rộng ngõ/ngách nhỏ nhất (m)',
+            'Khoảng cách tới trục đường chính (m)',
+            'Mục đích sử dụng đất',
+            # 'Tọa độ (vĩ độ)', # Cái này tạm thời như này trước khi có data mới
+            # 'Tọa độ (kinh độ)' # Cái này tạm thời như này trước khi có data mới
+        ]
+        cleaned_df = cleaned_df.dropna(subset=na)
+
+        # Drop duplicates
+        dup = [
+            'Tỉnh/Thành phố', 
+            'Thành phố/Quận/Huyện/Thị xã', 
+            'Xã/Phường/Thị trấn', 
+            'Đường phố', 
+            'Giá rao bán/giao dịch', 
+            'Giá ước tính', 
+            # 'Đơn giá đất', 
+            # 'Lợi thế kinh doanh', 
+            'Số tầng công trình', 
+            'Tổng diện tích sàn', 
+            'Đơn giá xây dựng', 
+            'Chất lượng còn lại', 
+            'Diện tích đất (m2)', 
+            'Kích thước mặt tiền (m)', 
+            'Kích thước chiều dài (m)', 
+            'Số mặt tiền tiếp giáp', 
+            'Hình dạng', 
+            'Độ rộng ngõ/ngách nhỏ nhất (m)', 
+            'Khoảng cách tới trục đường chính (m)', 
+            'Mục đích sử dụng đất'
+        ]
+        cleaned_df = cleaned_df.drop_duplicates(subset=dup)
         
         print("[OneHousing] Data cleaning completed.")
         return cleaned_df
