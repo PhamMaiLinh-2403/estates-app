@@ -11,7 +11,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 
 from fake_useragent import UserAgent
 
@@ -21,7 +20,7 @@ from database.database_manager import DatabaseManager
 
 class OneHousingScraper:
     """
-    Scraper for OneHousing website with database integration.
+    Scraper for OneHousing website.
     """
     
     def __init__(self, db_manager: DatabaseManager):
@@ -71,9 +70,9 @@ class OneHousingScraper:
             except Exception as e:
                 print(f"[OneHousing] Error closing driver: {e}")
     
-    # ===== STEP 1: SCRAPE URLs =====
+    # Step 1: Scrape URLs 
     
-    def get_listing_urls_from_page(self, html: str) -> List[str]:
+    def get_listing_urls_from_page(self, html):
         """Extract listing URLs from a page's HTML."""
         soup = BeautifulSoup(html, "html.parser")
         cards = soup.select('a[data-role="property-card"]')
@@ -88,21 +87,12 @@ class OneHousingScraper:
         
         return urls
     
-    def scrape_listing_urls(self, start_page: int = 1, end_page: int = 100) -> List[str]:
+    def scrape_listing_urls(self, start_page: int = 1, end_page: int = 100):
         """
         Scrape listing URLs from pagination pages.
-        
-        Args:
-            start_page: Starting page number
-            end_page: Ending page number
-            
-        Returns:
-            List of listing URLs
-        """
-        print(f"\n[OneHousing] Scraping URLs from pages {start_page} to {end_page}...")
-        
+        """      
         all_urls = set()
-        consecutive_failures = 0
+        consecutive_failures = 0    # Count failed requests.
         max_consecutive_failures = 3
         
         for page_num in range(start_page, end_page + 1):
@@ -145,15 +135,6 @@ class OneHousingScraper:
                 
                 # Respectful delay
                 time.sleep(random.uniform(1, 3))
-                
-            except requests.exceptions.RequestException as e:
-                consecutive_failures += 1
-                print(f"[OneHousing] Request error on page {page_num}: {e}")
-                
-                if consecutive_failures >= max_consecutive_failures:
-                    break
-                
-                time.sleep(RETRY_DELAY)
             
             except Exception as e:
                 print(f"[OneHousing] Unexpected error on page {page_num}: {e}")
@@ -161,11 +142,13 @@ class OneHousingScraper:
                 
                 if consecutive_failures >= max_consecutive_failures:
                     break
+
+                time.sleep(RETRY_DELAY)
         
         print(f"[OneHousing] Total URLs scraped: {len(all_urls)}")
         return set(list(all_urls)) 
     
-    # ===== STEP 2: SCRAPE DETAILS =====
+    # Step 2: Scrape listing details. 
     
     def extract_listing_details(self, url: str) -> Optional[Dict]:
         """
@@ -183,6 +166,7 @@ class OneHousingScraper:
             wait.until(EC.presence_of_element_located((By.XPATH, "/html/body")))
             
             def safe_text(by, selector, timeout=5):
+                """Helper function for text extraction."""
                 try:
                     return wait.until(
                         EC.presence_of_element_located((by, selector))
@@ -190,7 +174,7 @@ class OneHousingScraper:
                 except (TimeoutException, NoSuchElementException):
                     return None
             
-            # Extract basic data
+            # Data dictionary 
             data = {
                 "property_url": url,
                 "listing_title": safe_text(By.XPATH, '//*[@id="detail_title"]'),
@@ -202,6 +186,8 @@ class OneHousingScraper:
                 "city": None,
                 "district": None,
                 "features": [],
+                "latitude": None,
+                "longitude": None, 
                 "property_description": []
             }
             
@@ -214,18 +200,27 @@ class OneHousingScraper:
             except Exception:
                 pass
             
-            # Extract breadcrumbs for location
+            # Extract breadcrumbs for location and geolocation 
             try:
                 script_elements = self.driver.find_elements(By.XPATH, '//script[@type="application/ld+json"]')
                 for script_el in script_elements:
                     try:
                         json_data = json.loads(script_el.get_attribute("innerHTML"))
+
+                        # Extract location 
                         if isinstance(json_data, dict) and json_data.get("@type") == "BreadcrumbList":
                             for item in json_data.get("itemListElement", []):
                                 if item.get("position") == 2:
                                     data["city"] = item.get("name")
                                 elif item.get("position") == 3:
                                     data["district"] = item.get("name")
+                        
+                        # Extract geolocation 
+                        if isinstance(json_data, dict) and json_data.get("geo"):
+                            geo = json_data.get("geo", {})
+                            data["latitude"] = geo.get("latitude")
+                            data["longitude"] = geo.get("longitude")
+
                             break
                     except Exception:
                         continue
@@ -249,7 +244,7 @@ class OneHousingScraper:
                         continue
             except Exception:
                 pass
-            
+
             # Extract description
             try:
                 desc_div = self.driver.find_element(By.CSS_SELECTOR, 'div[data-testid="property-description"]')
@@ -272,15 +267,7 @@ class OneHousingScraper:
             data["property_description"] = ". ".join(data["property_description"])
             
             return data
-            
-        except (TimeoutException, NoSuchElementException) as e:
-            print(f"[OneHousing] Timeout/Element not found for {url}: {e}")
-            return None
-        except WebDriverException as e:
-            print(f"[OneHousing] WebDriver error for {url}: {e}")
-            # Try to reinitialize driver
-            self._close_driver()
-            return None
+
         except Exception as e:
             print(f"[OneHousing] Unexpected error for {url}: {e}")
             return None
