@@ -114,6 +114,8 @@ ONEHOUSING_RAW_TABLE = """
     district TEXT,
     alley_width TEXT,
     features TEXT, 
+    latitude REAL,
+    longitude REAL,
     property_description TEXT,
     image_url TEXT
     );
@@ -130,6 +132,8 @@ UNIQUE_INDEX_ONEHOUSING_RAW = """
     district,
     alley_width,
     features, 
+    latitude,
+    longitude,
     property_description,
     image_url
     );

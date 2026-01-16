@@ -191,65 +191,65 @@ def process_onehousing_df():
     # df['Thành phố/Quận/Huyện/Thị xã'] = df.apply(standardizer.standardize_district, axis=1)
     # df['Xã/Phường/Thị trấn'] = df.apply(standardizer.standardize_ward, axis=1)
     
-    # Missing coordinates in OH
-    if 'latitude' not in df.columns: df['latitude'] = np.nan
-    if 'longitude' not in df.columns: df['longitude'] = np.nan
+    # # Missing coordinates in OH
+    # if 'latitude' not in df.columns: df['latitude'] = np.nan
+    # if 'longitude' not in df.columns: df['longitude'] = np.nan
 
     # Rename to standardized schema
     oh_final = df.rename(columns={v: k for k, v in FINAL_SCHEMA.items() if v in df.columns})
     oh_final = oh_final[list(FINAL_SCHEMA.keys())]
 
-    # Drop NaN and duplicated values
-    na = [
-        'Tỉnh/Thành phố',
-        'Thành phố/Quận/Huyện/Thị xã',
-        'Xã/Phường/Thị trấn',
-        'Đường phố',
-        'Chi tiết',
-        'Nguồn thông tin', 
-        'Thời điểm giao dịch/rao bán',
-        'Giá rao bán/giao dịch',
-        'Giá ước tính',
-        'Số tầng công trình', 
-        'Tổng diện tích sàn', 
-        'Đơn giá xây dựng',
-        'Chất lượng còn lại',
-        'Diện tích đất (m2)',
-        'Kích thước mặt tiền (m)',
-        'Kích thước chiều dài (m)',
-        'Số mặt tiền tiếp giáp',
-        'Hình dạng',
-        'Độ rộng ngõ/ngách nhỏ nhất (m)',
-        'Khoảng cách tới trục đường chính (m)',
-        'Mục đích sử dụng đất',
-        'Tọa độ (vĩ độ)',
-        'Tọa độ (kinh độ)'
-    ]
-    dup = [
-        'Tỉnh/Thành phố', 
-        'Thành phố/Quận/Huyện/Thị xã', 
-        'Xã/Phường/Thị trấn', 
-        'Đường phố', 
-        'Giá rao bán/giao dịch', 
-        'Giá ước tính', 
-        'Số tầng công trình', 
-        'Tổng diện tích sàn', 
-        'Đơn giá xây dựng', 
-        'Chất lượng còn lại', 
-        'Diện tích đất (m2)', 
-        'Kích thước mặt tiền (m)', 
-        'Kích thước chiều dài (m)', 
-        'Số mặt tiền tiếp giáp', 
-        'Hình dạng', 
-        'Độ rộng ngõ/ngách nhỏ nhất (m)', 
-        'Khoảng cách tới trục đường chính (m)', 
-        'Mục đích sử dụng đất'
-    ]
+    # # Drop NaN and duplicated values
+    # na = [
+    #     'Tỉnh/Thành phố',
+    #     'Thành phố/Quận/Huyện/Thị xã',
+    #     'Xã/Phường/Thị trấn',
+    #     'Đường phố',
+    #     'Chi tiết',
+    #     'Nguồn thông tin', 
+    #     'Thời điểm giao dịch/rao bán',
+    #     'Giá rao bán/giao dịch',
+    #     'Giá ước tính',
+    #     'Số tầng công trình', 
+    #     'Tổng diện tích sàn', 
+    #     'Đơn giá xây dựng',
+    #     'Chất lượng còn lại',
+    #     'Diện tích đất (m2)',
+    #     'Kích thước mặt tiền (m)',
+    #     'Kích thước chiều dài (m)',
+    #     'Số mặt tiền tiếp giáp',
+    #     'Hình dạng',
+    #     'Độ rộng ngõ/ngách nhỏ nhất (m)',
+    #     'Khoảng cách tới trục đường chính (m)',
+    #     'Mục đích sử dụng đất',
+    #     'Tọa độ (vĩ độ)',
+    #     'Tọa độ (kinh độ)'
+    # ]
+    # dup = [
+    #     'Tỉnh/Thành phố', 
+    #     'Thành phố/Quận/Huyện/Thị xã', 
+    #     'Xã/Phường/Thị trấn', 
+    #     'Đường phố', 
+    #     'Giá rao bán/giao dịch', 
+    #     'Giá ước tính', 
+    #     'Số tầng công trình', 
+    #     'Tổng diện tích sàn', 
+    #     'Đơn giá xây dựng', 
+    #     'Chất lượng còn lại', 
+    #     'Diện tích đất (m2)', 
+    #     'Kích thước mặt tiền (m)', 
+    #     'Kích thước chiều dài (m)', 
+    #     'Số mặt tiền tiếp giáp', 
+    #     'Hình dạng', 
+    #     'Độ rộng ngõ/ngách nhỏ nhất (m)', 
+    #     'Khoảng cách tới trục đường chính (m)', 
+    #     'Mục đích sử dụng đất'
+    # ]
 
-    old_size = oh_final.shape[0]
-    oh_final.drop_duplicates(subset=dup, inplace=True)
-    oh_final.reset_index(drop=True)
-    print(f'Dropped {old_size - oh_final.shape[0]} duplicated rows for Onehousing.')
+    # old_size = oh_final.shape[0]
+    # oh_final.drop_duplicates(subset=dup, inplace=True)
+    # oh_final.reset_index(drop=True)
+    # print(f'Dropped {old_size - oh_final.shape[0]} duplicated rows for Onehousing.')
 
     # old_size = oh_final.shape[0]  
     # oh_final.dropna(subset=na, inplace=True)
@@ -310,8 +310,6 @@ def add_row_to_table(data_path, table_name):
     print(cols)
     placeholders = ",".join(["?"] * (len(cols)))
     quoted_cols = ",".join(f'"{col}"' for col in cols)
-    print(f'Placeholders: {placeholders}')
-    print(f'Quoted columns: {quoted_cols}')
 
     sql_statement = f"""
     INSERT OR IGNORE INTO {table_name} ({quoted_cols})
@@ -325,33 +323,37 @@ def add_row_to_table(data_path, table_name):
 def clean():
     print("\n--- PHASE 2: CLEANING & DATABASE SYNC ---")
     if not os.path.exists(DATABASE_DIR):
-        create_db()
+        create_db() 
 
     # Add raw data
-    with sqlite3.connect(DATABASE_DIR) as conn:
-        cursor = conn.cursor()    
+    print("Adding raw data...")
+    add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
+    add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
+    print("Finished adding raw data!")
 
-        # Add raw data
-        print("Adding raw data...")
-        add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
-        add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
-        print("Finished adding raw data!")
+    # Clean data
+    print("Cleaning data...")
+    standardizer = AddressStandardizer(
+        PROVINCES_SQL_FILE, DISTRICTS_SQL_FILE, 
+        WARDS_SQL_FILE, STREETS_SQL_FILE
+    )
+    df_bds_clean = process_batdongsan_df(standardizer=standardizer)
+    df_bds_clean['Web'] = 'Batdongsan'
+    df_oh_clean = process_onehousing_df()
+    df_oh_clean['Web'] = 'Onehousing'
+    df_oh_clean['Thời điểm giao dịch/rao bán'] = datetime.now().strftime("%d/%m/%Y")
 
-        # Clean data
-        print("Cleaning data...")
-        standardizer = AddressStandardizer(
-            PROVINCES_SQL_FILE, DISTRICTS_SQL_FILE, 
-            WARDS_SQL_FILE, STREETS_SQL_FILE
-        )
-        df_bds_clean = process_batdongsan_df(standardizer=standardizer)
-        df_bds_clean['Web'] = 'Batdongsan'
-        df_oh_clean = process_onehousing_df()
-        df_oh_clean['Web'] = 'Onehousing'
+    print(f'BDS: {df_bds_clean.columns}')
+    print(f'OH: {df_oh_clean.columns}')
 
-        df_cleaned = pd.concat([df_bds_clean, df_oh_clean], ignore_index=True)
-        df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
-        add_row_to_table(CLEANED_CSV_PATH, "cleaned")
-        print("Finished cleaning data!")
+    df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
+    print(f"Batdongsan original shape: {df_bds_clean.shape}")
+    print(f"Onehousing original shape: {df_oh_clean.shape}")
+    print(f'Final shape: {df_cleaned.shape}')
+    print(f'Columns: {df_cleaned.columns}')
+    df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
+    add_row_to_table(CLEANED_CSV_PATH, "cleaned")
+    print("Finished cleaning data!")
 
 
 def run_pipeline():
@@ -369,8 +371,8 @@ if __name__ == "__main__":
     if args.mode == "full":
         run_pipeline()
     elif args.mode == "scrape":
-        bds_scrape_urls()
-        bds_scrape_details()
+        # bds_scrape_urls()
+        # bds_scrape_details()
         oh_scrape_urls()
         oh_scrape_details()
     elif args.mode == "clean":

@@ -52,8 +52,6 @@ SEARCH_PAGE_URL = {
     "Onehousing": f"{BASE_URL['Onehousing']}/nha-dat-ban?",
 }
 
-CLEANED_CSV_PATH = OUTPUT_DIR / "real_estate_cleaned.csv"
-
 # =============================================================================
 # DIRECTORY & FILE PATHS
 # =============================================================================
@@ -73,6 +71,8 @@ DETAILS_CSV_PATH = {
     "Batdongsan": OUTPUT_DIR / "batdongsan_listing_details.csv",
     "Onehousing": OUTPUT_DIR / "onehousing_listings_details.csv",
 }
+
+CLEANED_CSV_PATH = OUTPUT_DIR / "real_estate_cleaned.csv"
 
 PROVINCES_SQL_FILE = ADMIN_DATA_DIR / "provinces_20250225_2.sql"
 DISTRICTS_SQL_FILE = ADMIN_DATA_DIR / "districts_20250225_2.sql"

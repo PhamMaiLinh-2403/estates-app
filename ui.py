@@ -15,8 +15,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
 import sqlite3
-from main import run_scrape_urls,run_scrape_details, run_cleaning_pipeline
-from src.config import *
+from commons.config import *
 from main import run_pipeline
 
 app = FastAPI()
@@ -126,12 +125,16 @@ async def download(job_id: str):
 
 # ------- Functions ------
 def extract_data(start_date, end_date, web):
-    with sqlite3.connect('output/scraped_data.db') as conn:
-        cursor = conn.cursor()
+    # start_date = datetime.strptime(start_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+    # end_date = datetime.strptime(end_date, "%d/%m/%Y").strftime("%Y-%m-%d")
 
-        sql_statement = """
+    with sqlite3.connect(DATABASE_DIR) as conn:
+        cursor = conn.cursor()
+        
+        if web == 'Cả hai':
+            sql_statement = """
                         SELECT *
-                        FROM nharieng
+                        FROM cleaned
                         WHERE
                         date(
                             substr("Thời điểm giao dịch/rao bán", 7, 4) || '-' ||
@@ -140,11 +143,27 @@ def extract_data(start_date, end_date, web):
                         )
                         BETWEEN date(?) AND date(?)
                         """
+            cursor.execute(
+                sql_statement,
+                (start_date, end_date))
+        else:
+            sql_statement = """
+                            SELECT *
+                            FROM cleaned
+                            WHERE
+                            date(
+                                substr("Thời điểm giao dịch/rao bán", 7, 4) || '-' ||
+                                substr("Thời điểm giao dịch/rao bán", 4, 2) || '-' ||
+                                substr("Thời điểm giao dịch/rao bán", 1, 2)
+                            )
+                            BETWEEN date(?) AND date(?)
+                            AND Web = (?)
+                            """
         
-        cursor.execute(
-            sql_statement,
-            (start_date, end_date)
-        )
+            cursor.execute(
+                sql_statement,
+                (start_date, end_date, web)
+            )
 
         rows = cursor.fetchall()
 
