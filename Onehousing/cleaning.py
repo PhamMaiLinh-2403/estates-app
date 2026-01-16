@@ -45,7 +45,7 @@ class OneHousingDataCleaner:
         return np.nan
 
     @staticmethod
-    def _extract_location(df):
+    def _extract_ward(df):
         """Extract ward/commune information."""
         def extract_row(row):
             full_address = row.get('listing_title', '')
@@ -55,39 +55,44 @@ class OneHousingDataCleaner:
                     pd.isna(district) or not isinstance(district, str):
                 return np.nan
 
-            pattern_str = r",\s*((?:P|X|TT)\.\s*[^,]+?)\s*,\s*" + re.escape(district)
-            match = re.search(pattern_str, full_address)
-
-            def standardize_prefix(location_str):
-                location_str = location_str.strip()
-                if location_str.startswith("P."):
-                    return location_str.replace("P.", "Phường", 1).strip()
-                elif location_str.startswith("X."):
-                    return location_str.replace("X.", "Xã", 1).strip()
-                elif location_str.startswith("TT."):
-                    return location_str.replace("TT.", "Thị trấn", 1).strip()
-                return location_str
-
-            if match:
-                return standardize_prefix(match.group(1))
-
-            parts = [part.strip() for part in full_address.split(',')]
+            address_list = full_address.split(",")
             try:
-                district_index = -1
-                for i, part_val in enumerate(parts):
-                    if part_val == district:
-                        district_index = i
-                        break
+                return address_list[-3].replace("X.", "Xã").replace("P.", "Phường").replace("TT.", "Thị trấn").strip()
+            except:
+                return np.nan
+            # pattern_str = r",\s*((?:P|X|TT)\.\s*[^,]+?)\s*,\s*" + re.escape(district)
+            # match = re.search(pattern_str, full_address)
 
-                if district_index > 0:
-                    location = parts[district_index - 1]
-                    if location.upper().startswith(("P.", "X.", "TT.")):
-                        return standardize_prefix(location)
+            # def standardize_prefix(location_str):
+            #     location_str = location_str.strip()
+            #     if location_str.startswith("P."):
+            #         return location_str.replace("P.", "Phường", 1).strip()
+            #     elif location_str.startswith("X."):
+            #         return location_str.replace("X.", "Xã", 1).strip()
+            #     elif location_str.startswith("TT."):
+            #         return location_str.replace("TT.", "Thị trấn", 1).strip()
+            #     return location_str
 
-            except (IndexError, ValueError):
-                pass
+            # if match:
+            #     return standardize_prefix(match.group(1))
 
-            return np.nan
+            # parts = [part.strip() for part in full_address.split(',')]
+            # try:
+            #     district_index = -1
+            #     for i, part_val in enumerate(parts):
+            #         if part_val == district:
+            #             district_index = i
+            #             break
+
+            #     if district_index > 0:
+            #         location = parts[district_index - 1]
+            #         if location.upper().startswith(("P.", "X.", "TT.")):
+            #             return standardize_prefix(location)
+
+            # except (IndexError, ValueError):
+            #     pass
+
+            # return np.nan
 
         return df.apply(extract_row, axis=1)
 
@@ -308,7 +313,7 @@ class OneHousingDataCleaner:
         # Temporarily add district column for location extraction
         df_temp = df.copy()
         df_temp['district'] = district
-        location = OneHousingDataCleaner._extract_location(df_temp)
+        location = OneHousingDataCleaner._extract_ward(df_temp)
         
         street = OneHousingDataCleaner._extract_street_name(df["listing_title"])
         prop_type = df["listing_title"].apply(OneHousingDataCleaner._classify_property_type)
