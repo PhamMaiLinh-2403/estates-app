@@ -5,6 +5,7 @@ import csv
 import queue
 import time
 import random
+import pandas as pd
 from typing import List
 
 from commons.config import * 
@@ -76,8 +77,13 @@ def csv_details_writer_listener(data_queue: queue.Queue, stop_event: threading.E
     output_path.parent.mkdir(parents=True, exist_ok=True)
     file_exists = output_path.exists()
 
-    with open(output_path, mode='w') as f:
-        f.write('')
+    file_is_empty = (
+        not output_path.exists()
+        or output_path.stat().st_size == 0
+    )
+
+    # with open(output_path, mode='w') as f:
+    #     f.write('')
 
     with open(output_path, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = None
@@ -93,9 +99,12 @@ def csv_details_writer_listener(data_queue: queue.Queue, stop_event: threading.E
                 if writer is None and buffer:
                     fieldnames = list(buffer[0].keys())
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    if not file_exists:
+                    if file_is_empty:
                         writer.writeheader()
-                        file_exists = True
+                        file_is_empty = False
+                    # if not file_exists:
+                    #     writer.writeheader()
+                    #     file_exists = True
 
                 if len(buffer) >= batch_size and writer:
                     writer.writerows(buffer)
@@ -198,9 +207,12 @@ def scrape_onehousing_details():
         print(f"[Error] Input file {input_file} not found!")
         return
 
-    with open(input_file, mode='r', encoding='utf-8-sig') as f:
-        reader = csv.DictReader(f)
-        urls = [row['url'] for row in reader if row.get('url')]
+    urls_df = pd.read_csv(input_file, header=None)
+    urls = urls_df[0].tolist()
+
+    # with open(input_file, mode='r', encoding='utf-8-sig') as f:
+    #     reader = csv.DictReader(f)
+    #     urls = [row['url'] for row in reader if row.get('url')]
 
     print(f"[Orchestrator] Total URLs to process: {len(urls)}")
     data_queue = queue.Queue()

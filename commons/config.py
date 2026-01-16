@@ -52,6 +52,8 @@ SEARCH_PAGE_URL = {
     "Onehousing": f"{BASE_URL['Onehousing']}/nha-dat-ban?",
 }
 
+CLEANED_CSV_PATH = OUTPUT_DIR / "real_estate_cleaned.csv"
+
 # =============================================================================
 # DIRECTORY & FILE PATHS
 # =============================================================================
