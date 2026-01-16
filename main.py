@@ -347,9 +347,6 @@ def clean():
         print("Finished cleaning data!")
 
 
-        
-
-
 def run_pipeline():
     bds_scrape_urls()
     bds_scrape_details()
