@@ -23,13 +23,6 @@ class OneHousingDataCleaner:
                 return city.split(',')[-1].replace('TP.', 'Thành phố').replace('T.', 'Tỉnh').strip()
             except:
                 return np.nan
-        # if pd.notna(row.get("city")):
-        #     return str(row["city"]).replace("TP.", "Thành phố").strip()
-
-        # title = str(row.get("listing_title", ""))
-        # match = re.search(r"(TP\.|Thành phố)\s*([^.,\n]+)", title, re.IGNORECASE)
-
-        # return f"Thành phố {match.group(2).strip()}" if match else np.nan
 
     @staticmethod
     def _extract_district(row):
@@ -43,25 +36,6 @@ class OneHousingDataCleaner:
         if pd.notna(title):
             return title.split(",")[-2].replace('TP.').replace('Q.', "Quận").replace('H.', "Huyện").replace('TX.', 'Thị xã').strip()
         return np.nan
-    
-        # district = row.get("district")
-
-        # if pd.notna(district):
-        #     return str(district).replace("Q.", "Quận").replace("H.", "Huyện").replace("TX.", "Thị xã").strip()
-
-        # title = str(row.get("listing_title", ""))
-        # match = re.search(r"\b(Q\.|H\.|TX\.)\s*([^.,\n]+)", title, re.IGNORECASE)
-
-        # if match:
-        #     prefix, name = match.group(1).upper(), match.group(2).strip()
-        #     if prefix == "Q.":
-        #         return f"Quận {name}"
-        #     if prefix == "H.":
-        #         return f"Huyện {name}"
-        #     if prefix == "TX.":
-        #         return f"Thị xã {name}"
-
-        # return np.nan
 
     @staticmethod
     def _extract_ward(df):
@@ -79,39 +53,6 @@ class OneHousingDataCleaner:
                 return address_list[-3].replace("X.", "Xã").replace("P.", "Phường").replace("TT.", "Thị trấn").strip()
             except:
                 return np.nan
-            # pattern_str = r",\s*((?:P|X|TT)\.\s*[^,]+?)\s*,\s*" + re.escape(district)
-            # match = re.search(pattern_str, full_address)
-
-            # def standardize_prefix(location_str):
-            #     location_str = location_str.strip()
-            #     if location_str.startswith("P."):
-            #         return location_str.replace("P.", "Phường", 1).strip()
-            #     elif location_str.startswith("X."):
-            #         return location_str.replace("X.", "Xã", 1).strip()
-            #     elif location_str.startswith("TT."):
-            #         return location_str.replace("TT.", "Thị trấn", 1).strip()
-            #     return location_str
-
-            # if match:
-            #     return standardize_prefix(match.group(1))
-
-            # parts = [part.strip() for part in full_address.split(',')]
-            # try:
-            #     district_index = -1
-            #     for i, part_val in enumerate(parts):
-            #         if part_val == district:
-            #             district_index = i
-            #             break
-
-            #     if district_index > 0:
-            #         location = parts[district_index - 1]
-            #         if location.upper().startswith(("P.", "X.", "TT.")):
-            #             return standardize_prefix(location)
-
-            # except (IndexError, ValueError):
-            #     pass
-
-            # return np.nan
 
         return df.apply(extract_row, axis=1)
 
@@ -311,15 +252,7 @@ class OneHousingDataCleaner:
     def clean_onehousing_data(df: pd.DataFrame) -> pd.DataFrame:
         """
         Apply all cleaning transformations to OneHousing raw data.
-        
-        Args:
-            df: DataFrame with raw OneHousing data
-            
-        Returns:
-            Cleaned DataFrame in standardized format
-        """
-        print("[OneHousing] Starting data cleaning...")
-        
+        """   
         # Rename property_id to ID for consistency
         if 'property_id' in df.columns:
             df = df.copy()
@@ -344,6 +277,8 @@ class OneHousingDataCleaner:
         front_width = df.apply(OneHousingDataCleaner._extract_front_width, axis=1)
         remaining_quality = df.apply(OneHousingDataCleaner._estimate_remaining_quality, axis=1)
         construction_price = df.apply(OneHousingDataCleaner._estimate_construction_price, axis=1)
+        latitude = df["latitude"]
+        longitude = df["longitude"]
 
         with np.errstate(divide='ignore', invalid='ignore'):
             floors_for_calc = floors.fillna(1.0)
@@ -379,8 +314,8 @@ class OneHousingDataCleaner:
             "Khoảng cách tới trục đường chính (m)": df.apply(OneHousingDataCleaner._extract_distance_to_main_road, axis=1),
             "Mục đích sử dụng đất": "Đất ở",
             "Yếu tố khác": "",
-            "Tọa độ (vĩ độ)": np.nan,
-            "Tọa độ (kinh độ)": np.nan,
+            "Tọa độ (vĩ độ)": latitude,
+            "Tọa độ (kinh độ)": longitude,
             "Hình ảnh của bài đăng": df["image_url"]
         })
 
@@ -409,8 +344,8 @@ class OneHousingDataCleaner:
             'Độ rộng ngõ/ngách nhỏ nhất (m)',
             'Khoảng cách tới trục đường chính (m)',
             'Mục đích sử dụng đất',
-            # 'Tọa độ (vĩ độ)', # Cái này tạm thời như này trước khi có data mới
-            # 'Tọa độ (kinh độ)' # Cái này tạm thời như này trước khi có data mới
+            'Tọa độ (vĩ độ)', 
+            'Tọa độ (kinh độ)' 
         ]
         cleaned_df = cleaned_df.dropna(subset=na)
 
