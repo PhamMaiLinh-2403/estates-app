@@ -20,16 +20,13 @@ def signal_handler(sig, frame):
     interrupt_count += 1
     
     if interrupt_count == 1:
-        print("\n[INTERRUPT] Ctrl+C detected! Stopping workers gracefully...")
-        print("[INTERRUPT] Press Ctrl+C again to force quit (may lose data)")
+        print("\nInterrupt received. Stopping workers gracefully...")
         stop_event.set()
     else:
-        print("\n[FORCE QUIT] Exiting immediately!")
+        print("\nForce quit! Some data may be lost.")
         sys.exit(1)
 
-# Register signal handler
 signal.signal(signal.SIGINT, signal_handler)
-
 
 def csv_writer_listener(url_queue: queue.Queue, stop_event: threading.Event):
     """
@@ -51,19 +48,13 @@ def csv_writer_listener(url_queue: queue.Queue, stop_event: threading.Event):
     with open(URLS_CSV_PATH['Batdongsan'], mode='a', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(['url'])
+            writer.writerow(['url']) # Header
         
-        while True:
-            # Check stop event first
-            if stop_event.is_set() and url_queue.empty():
-                print("[Writer] Stop event set and queue empty. Exiting.")
-                break
-                
+        while not stop_event.is_set() or not url_queue.empty():
             try:
-                data = url_queue.get(timeout=0.5)  # Shorter timeout for responsiveness
+                data = url_queue.get(timeout=1.0)
 
                 if data is None:
-                    print("[Writer] Received shutdown signal.")
                     break
                 
                 # Data comes in as a list of URLs from a single page
@@ -77,17 +68,10 @@ def csv_writer_listener(url_queue: queue.Queue, stop_event: threading.Event):
                     writer.writerows(buffer)
                     total_saved += len(buffer)
                     print(f"[Writer] Saved batch of {len(buffer)}. Total saved: {total_saved}")
-                    buffer = []
-                    f.flush()
+                    buffer = [] # Clear buffer
+                    f.flush()   # Ensure data hits the disk
             
             except queue.Empty:
-                # Flush buffer even if not full when stopping
-                if stop_event.is_set() and buffer:
-                    writer.writerows(buffer)
-                    total_saved += len(buffer)
-                    print(f"[Writer] Emergency flush: {len(buffer)}. Total saved: {total_saved}")
-                    buffer = []
-                    f.flush()
                 continue
             except Exception as e:
                 print(f"[Writer] Error writing to CSV: {e}")
@@ -97,17 +81,17 @@ def csv_writer_listener(url_queue: queue.Queue, stop_event: threading.Event):
             writer.writerows(buffer)
             total_saved += len(buffer)
             print(f"[Writer] Final flush: {len(buffer)}. Total saved: {total_saved}")
-            f.flush()
-
 
 def csv_details_writer_listener(data_queue: queue.Queue, stop_event: threading.Event):
     """
     A dedicated thread that pulls Listing Details (dicts) from the queue and writes them to CSV.
+    Supports real-time batch writing and dynamic header detection.
     """
     batch_size = 5
     buffer = []
     total_saved = 0
     
+    # Define output path for details
     details_output_path = DETAILS_CSV_PATH["Batdongsan"]
     details_output_path.parent.mkdir(parents=True, exist_ok=True)
     
@@ -120,47 +104,36 @@ def csv_details_writer_listener(data_queue: queue.Queue, stop_event: threading.E
     with open(details_output_path, mode='a', newline='', encoding='utf-8-sig') as f:
         writer = None
         
-        while True:
-            # Check stop event first
-            if stop_event.is_set() and data_queue.empty():
-                print("[Writer] Stop event set and queue empty. Exiting.")
-                break
-                
+        while not stop_event.is_set() or not data_queue.empty():
             try:
-                data = data_queue.get(timeout=0.5)  # Shorter timeout
+                data = data_queue.get(timeout=1.0)
 
                 if data is None:
-                    print("[Writer] Received shutdown signal.")
                     break
                 
                 buffer.append(data)
                 data_queue.task_done()
 
-                # Initialize writer with headers from the first record
+                # Initialize writer with headers from the first record if not exists
                 if writer is None and buffer:
+                    # If file didn't exist, we write headers. 
+                    # If file exists, we assume headers match (or append anyway).
                     fieldnames = list(buffer[0].keys())
                     writer = csv.DictWriter(f, fieldnames=fieldnames)
                     
                     if not file_exists:
                         writer.writeheader()
-                        file_exists = True
+                        file_exists = True # Prevent re-writing header
 
                 # Flush if buffer is full
                 if len(buffer) >= batch_size and writer:
                     writer.writerows(buffer)
                     total_saved += len(buffer)
                     print(f"[Writer] Saved details batch of {len(buffer)}. Total saved: {total_saved}")
-                    buffer = []
+                    buffer = [] 
                     f.flush()
             
             except queue.Empty:
-                # Flush buffer when stopping
-                if stop_event.is_set() and buffer and writer:
-                    writer.writerows(buffer)
-                    total_saved += len(buffer)
-                    print(f"[Writer] Emergency flush: {len(buffer)}. Total saved: {total_saved}")
-                    buffer = []
-                    f.flush()
                 continue
             except Exception as e:
                 print(f"[Writer] Error writing details to CSV: {e}")
@@ -170,22 +143,18 @@ def csv_details_writer_listener(data_queue: queue.Queue, stop_event: threading.E
             writer.writerows(buffer)
             total_saved += len(buffer)
             print(f"[Writer] Final details flush: {len(buffer)}. Total saved: {total_saved}")
-            f.flush()
 
 
 def scrape_urls_multithreaded():
     """
     Phase 1: Scrape listing URLs from search pages using multiple workers
+    and stream results to CSV immediately.
     """
     global interrupt_count
     interrupt_count = 0  
-    stop_event.clear()
+    stop_event.clear()   
     
-    print("\n=== STARTING URL COLLECTION ===")
-    print("Press Ctrl+C once to stop gracefully")
-    print("Press Ctrl+C twice to force quit\n")
-    
-    # Setup Queue and Writer
+    # 1. Setup Queue and Writer
     url_queue = queue.Queue()
     writer_thread = threading.Thread(
         target=csv_writer_listener,
@@ -194,7 +163,7 @@ def scrape_urls_multithreaded():
     )
     writer_thread.start()
 
-    # Split Work
+    # 2. Split Work
     page_ranges = split_page_ranges(
         START_PAGE_NUMBER,
         END_PAGE_NUMBER,
@@ -203,7 +172,7 @@ def scrape_urls_multithreaded():
     
     threads = []
     
-    # Start Workers
+    # 3. Start Workers
     for worker_id, (start_page, end_page) in enumerate(page_ranges):
         thread = threading.Thread(
             target=scrape_urls_worker,
@@ -213,23 +182,23 @@ def scrape_urls_multithreaded():
         threads.append(thread)
         thread.start()
     
-    # Monitor Workers
-    _monitor_threads(threads, "URL collection")
+    # 4. Monitor Workers
+    _monitor_threads(threads)
     
-    # Stop Writer
-    print("\n[Main] All workers finished. Stopping writer...")
-    url_queue.put(None)
-    writer_thread.join(timeout=10)
+    # 5. Stop Writer
+    print("\nAll workers finished. Stopping writer...")
+    url_queue.put(None) 
+    writer_thread.join()
     
     if stop_event.is_set():
-        print("\n[STOPPED] URL collection interrupted by user.")
+        print("\nURL collection interrupted by user.")
     else:
-        print("\n[COMPLETE] URL collection completed successfully.")
-
+        print("\nURL collection completed successfully.")
 
 def scrape_details_multithreaded():
     """
-    Phase 2: Read URLs from CSV, scrape details, and save in real-time
+    Phase 2: Read URLs from the CSV generated in Phase 1, scrape details,
+    add timestamps, and save to a new CSV in real-time.
     """
     global interrupt_count
     interrupt_count = 0
@@ -238,28 +207,25 @@ def scrape_details_multithreaded():
     input_csv = URLS_CSV_PATH['Batdongsan']
     
     if not input_csv.exists():
-        print(f"[ERROR] Input file {input_csv} not found. Run URL scraping first.")
+        print(f"Error: Input file {input_csv} not found. Run URL scraping first.")
         return
 
-    print("\n=== STARTING DETAIL SCRAPING ===")
-    print("Press Ctrl+C once to stop gracefully")
-    print("Press Ctrl+C twice to force quit\n")
-
-    # Read URLs
+    # 1. Read URLs from CSV
     print(f"Reading URLs from {input_csv}...")
     urls_to_scrape = []
     try:
         with open(input_csv, mode='r', encoding='utf-8-sig') as f:
             reader = csv.DictReader(f)
+            # Filter out empty rows or None
             urls_to_scrape = [row['url'] for row in reader if row and row.get('url')]
     except Exception as e:
-        print(f"[ERROR] reading input CSV: {e}")
+        print(f"Error reading input CSV: {e}")
         return
 
     total_urls = len(urls_to_scrape)
-    print(f"Loaded {total_urls} URLs. Preparing workers...\n")
+    print(f"Loaded {total_urls} URLs. Preparing workers...")
 
-    # Setup Queue and Writer
+    # 2. Setup Queue and Writer
     data_queue = queue.Queue()
     writer_thread = threading.Thread(
         target=csv_details_writer_listener,
@@ -268,14 +234,15 @@ def scrape_details_multithreaded():
     )
     writer_thread.start()
 
-    # Split Work
+    # 3. Split Work
+    # Using 'chunks' to split the list of URLs evenly among workers
     url_chunks = list(chunks(urls_to_scrape, MAX_WORKERS))
+    
     threads = []
 
-    # Start Workers
+    # 4. Start Workers
     for worker_id, url_subset in enumerate(url_chunks):
-        if not url_subset:
-            continue
+        if not url_subset: continue
         
         thread = threading.Thread(
             target=scrape_details_worker,
@@ -285,36 +252,34 @@ def scrape_details_multithreaded():
         threads.append(thread)
         thread.start()
 
-    # Monitor Workers
-    _monitor_threads(threads, "Detail scraping")
+    # 5. Monitor Workers
+    _monitor_threads(threads)
 
-    # Stop Writer
-    print("\n[Main] All workers finished. Stopping writer...")
+    # 6. Stop Writer
+    print("\nAll workers finished. Stopping writer...")
     data_queue.put(None)
-    writer_thread.join(timeout=10)
+    writer_thread.join()
 
     if stop_event.is_set():
-        print("\n[STOPPED] Detail scraping interrupted by user.")
+        print("\nDetail scraping interrupted by user.")
     else:
-        print("\n[COMPLETE] Detail scraping completed successfully.")
+        print("\nDetail scraping completed successfully.")
 
-
-def _monitor_threads(threads, task_name="Task"):
+def _monitor_threads(threads):
     """Helper to join threads and handle interruptions."""
     try:
         while any(t.is_alive() for t in threads):
-            if stop_event.is_set():
-                print(f"\n[Monitor] Stop requested for {task_name}. Waiting for workers to finish...")
-                # Give threads time to finish current work
-                for thread in threads:
-                    thread.join(timeout=5)
-                break
+            for thread in threads:
+                thread.join(timeout=0.5)
             
-            # Check thread status periodically
-            time.sleep(0.5)
+            if stop_event.is_set():
+                print("\nWaiting for active workers to finish current task (max 30s)...")
+                for thread in threads:
+                    thread.join(timeout=30)
+                break
                 
     except KeyboardInterrupt:
-        print(f"\n[Monitor] Keyboard interrupt in monitor for {task_name}")
+        print("\nMain thread interrupted, signaling workers...")
         stop_event.set()
         for thread in threads:
-            thread.join(timeout=5)
+            thread.join(timeout=30)
