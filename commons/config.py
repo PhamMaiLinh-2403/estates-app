@@ -35,7 +35,7 @@ RETRY_DELAY = 2          # Delay khi bị hỏng connection và retry lại
 SELENIUM_WAIT_TIME = 5   # Delay khi mở web của Selenium để đỡ bị tranh tài nguyên
 
 START_PAGE_NUMBER = 1
-END_PAGE_NUMBER = 50
+END_PAGE_NUMBER = 20 
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 
@@ -91,6 +91,15 @@ SCRAPING_DETAILS_CONFIG = {
     "stagger_mode": "random",
     "stagger_step_sec": 3.0,
     "stagger_max_sec": 3.0,
+}
+
+# =============================================================================
+# CSV WRITER CONFIGURATION
+# =============================================================================
+CSV_WRITER_CONFIG = {
+    "url_batch_size": 10,
+    "details_batch_size": 5,
+    "encoding": "utf-8-sig",
 }
 
 # =============================================================================
