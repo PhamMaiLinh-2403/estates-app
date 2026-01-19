@@ -371,10 +371,10 @@ if __name__ == "__main__":
     if args.mode == "full":
         run_pipeline()
     elif args.mode == "scrape":
-        # bds_scrape_urls()
-        # bds_scrape_details()
+        bds_scrape_urls()
+        bds_scrape_details()
         oh_scrape_urls()
         oh_scrape_details()
-    elif args.mode == "clean":
-        # Note: Database insertion logic is part of run_pipeline/clean mode
-        clean() # Simplified for this structure
+    # elif args.mode == "clean":
+    #     # Note: Database insertion logic is part of run_pipeline/clean mode
+    #     clean() # Simplified for this structure

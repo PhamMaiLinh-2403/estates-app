@@ -29,9 +29,9 @@ class DatabaseManager:
     def _ensure_schema(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(BDS_RAW_LISTINGS_TABLE) 
-            cursor.execute(ONEHOUSING_RAW_LISTINGS_TABLE)
-            cursor.execute(CLEANED_LISTINGS_TABLE)
+            cursor.execute(BDS_RAW_TABLE) 
+            cursor.execute(ONEHOUSING_RAW_TABLE)
+            cursor.execute(CLEANED_TABLE)
 
     def _generate_key(self, index: int) -> str:
         """Generates key: timestamp_index."""

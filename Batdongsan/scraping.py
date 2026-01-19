@@ -15,7 +15,6 @@ from commons.retry import retry
 class Scraper:
     """
     Scraping data utility functions, using a Selenium WebDriver instance.
-    Optimized for robustness with explicit waits and retries.
     """
     def __init__(self, driver: WebDriver):
         """Initializes the scraper with a Selenium WebDriver instance."""
