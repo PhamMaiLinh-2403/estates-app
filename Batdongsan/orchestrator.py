@@ -5,11 +5,11 @@ import pandas as pd
 import numpy as np 
 
 from commons.config import * 
-from .selenium_manager import *
 from commons.utils import * 
 from commons.writers import *
-
 from commons.config import * 
+
+from .selenium_manager import *
 from .address_standardizer import AddressStandardizer 
 from .cleaning import DataCleaner, DataImputer, FeatureEngineer
 

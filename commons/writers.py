@@ -1,7 +1,7 @@
 import csv
 import queue
 import threading
-from config import CSV_WRITER_CONFIG
+from commons.config import * 
 
 def csv_url_writer_listener(url_queue: queue.Queue, stop_event: threading.Event, output_path):
     """Write URLs to CSV."""
