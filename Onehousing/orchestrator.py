@@ -14,7 +14,9 @@ from commons.utils import *
 from .init_browser import *
 from .fetch_urls import *
 from .fetch_listings import *
+from .cleaning import OneHousingDataCleaner 
 from commons.writers import * 
+from commons.config import * 
 
 
 def onehousing_url_worker(worker_id: int, page_range: List[int], url_queue: queue.Queue):
@@ -143,3 +145,75 @@ def scrape_onehousing_details():
     writer_thread.join()
     
     print("[Orchestrator] Detail scraping finished")
+
+def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schema=FINAL_SCHEMA):
+    "Orchestrate cleaning logic for Onehousing data."
+    if not raw_path.exists():
+        return pd.DataFrame()
+
+    df_raw = pd.read_csv(raw_path)
+    df = OneHousingDataCleaner.clean_onehousing_data(df_raw)
+
+    # Rename to standardized schema
+    oh_final = df.rename(columns={v: k for k, v in final_schema.items() if v in df.columns})
+    oh_final = oh_final[list(final_schema.keys())]
+
+    # # Drop NaN and duplicated values
+    na = [
+        'Tỉnh/Thành phố',
+        'Thành phố/Quận/Huyện/Thị xã',
+        'Xã/Phường/Thị trấn',
+        'Đường phố',
+        'Chi tiết',
+        'Nguồn thông tin', 
+        'Thời điểm giao dịch/rao bán',
+        'Giá rao bán/giao dịch',
+        'Giá ước tính',
+        'Số tầng công trình', 
+        'Tổng diện tích sàn', 
+        'Đơn giá xây dựng',
+        'Chất lượng còn lại',
+        'Diện tích đất (m2)',
+        'Kích thước mặt tiền (m)',
+        'Kích thước chiều dài (m)',
+        'Số mặt tiền tiếp giáp',
+        'Hình dạng',
+        'Độ rộng ngõ/ngách nhỏ nhất (m)',
+        'Khoảng cách tới trục đường chính (m)',
+        'Mục đích sử dụng đất',
+        'Tọa độ (vĩ độ)',
+        'Tọa độ (kinh độ)'
+    ]
+    dup = [
+        'Tỉnh/Thành phố', 
+        'Thành phố/Quận/Huyện/Thị xã', 
+        'Xã/Phường/Thị trấn', 
+        'Đường phố', 
+        'Giá rao bán/giao dịch', 
+        'Giá ước tính', 
+        'Số tầng công trình', 
+        'Tổng diện tích sàn', 
+        'Đơn giá xây dựng', 
+        'Chất lượng còn lại', 
+        'Diện tích đất (m2)', 
+        'Kích thước mặt tiền (m)', 
+        'Kích thước chiều dài (m)', 
+        'Số mặt tiền tiếp giáp', 
+        'Hình dạng', 
+        'Độ rộng ngõ/ngách nhỏ nhất (m)', 
+        'Khoảng cách tới trục đường chính (m)', 
+        'Mục đích sử dụng đất'
+    ]
+
+    old_size = oh_final.shape[0]
+    oh_final.drop_duplicates(subset=dup, inplace=True)
+    oh_final.reset_index(drop=True)
+    print(f'Dropped {old_size - oh_final.shape[0]} duplicated rows for Onehousing.')
+
+    old_size = oh_final.shape[0]  
+    oh_final.dropna(subset=na, inplace=True)
+    print(f'Dropped {old_size - oh_final.shape[0]} NaN rows for Onehousing.')
+
+    print(f'Final number of rows for Onehousing: {oh_final.shape[0]}')
+
+    return oh_final
