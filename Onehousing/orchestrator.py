@@ -190,7 +190,7 @@ def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schem
         'Xã/Phường/Thị trấn', 
         'Đường phố', 
         'Giá rao bán/giao dịch', 
-        'Giá ước tính', 
+        'Giá ước tính',
         'Số tầng công trình', 
         'Tổng diện tích sàn', 
         'Đơn giá xây dựng', 
@@ -208,8 +208,6 @@ def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schem
     old_size = oh_final.shape[0]
     oh_final.drop_duplicates(subset=dup, inplace=True)
     print(f'Dropped {old_size - oh_final.shape[0]} duplicated rows for Onehousing.')
-
-    print(oh_final.info())
 
     old_size = oh_final.shape[0]  
     oh_final.dropna(subset=na, inplace=True)

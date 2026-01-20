@@ -181,7 +181,7 @@ def process_batdongsan_data(raw_path=DETAILS_CSV_PATH['Batdongsan'], final_schem
         'Xã/Phường/Thị trấn', 
         'Đường phố', 
         'Giá rao bán/giao dịch', 
-        'Giá ước tính', 
+        'Giá ước tính',
         'Đơn giá đất', 
         'Lợi thế kinh doanh', 
         'Số tầng công trình', 

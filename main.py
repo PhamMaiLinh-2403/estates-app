@@ -41,10 +41,12 @@ def clean():
     print("Cleaning data...")
     df_bds_clean = process_batdongsan_data()
     df_bds_clean['Web'] = 'Batdongsan'
+    print('Finished cleaning Batdongsan.')
     df_oh_clean = process_onehousing_data()
     df_oh_clean['Web'] = 'Onehousing'
     df_oh_clean['Thời điểm giao dịch/rao bán'] = datetime.now().strftime("%d/%m/%Y")
-
+    print('Finished cleaning Onehousing.')
+    
     # print(f'BDS: {df_bds_clean.columns}')
     # print(f'OH: {df_oh_clean.columns}')
 
