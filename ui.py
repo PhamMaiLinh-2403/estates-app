@@ -13,7 +13,7 @@ from apscheduler.triggers.date import DateTrigger
 
 from commons.config import *
 from commons.state_manager import PipelineStateManager
-from main import run_pipeline_safe, run_pipeline
+from main import run_pipeline_safe #, run_pipeline
 
 from Batdongsan.orchestrator import (
     process_batdongsan_data 
@@ -24,7 +24,7 @@ from Onehousing.orchestrator import (
 )
 import pytz
 import sqlite3
-from main import run_scrape_urls,run_scrape_details, run_cleaning_pipeline
+# from main import run_scrape_urls,run_scrape_details, run_cleaning_pipeline
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
