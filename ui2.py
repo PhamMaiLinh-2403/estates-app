@@ -16,7 +16,7 @@ from apscheduler.triggers.cron import CronTrigger
 import pytz
 import sqlite3
 from commons.config import *
-from main import run_pipeline
+from main import run_pipeline_safe
 
 from Batdongsan.orchestrator import (
     process_batdongsan_data 
