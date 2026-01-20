@@ -1,22 +1,20 @@
-from fastapi import FastAPI, Request, Query, Path, Form
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from io import BytesIO
 import uuid
-from pydantic import BaseModel
-from typing import Annotated
-from fastapi.templating import Jinja2Templates
-from datetime import datetime, date
-import time
 import pandas as pd
-from tqdm import tqdm
 import threading
 import traceback
+from datetime import datetime, timedelta
+import sqlite3
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-import pytz
-import sqlite3
+from apscheduler.triggers.date import DateTrigger
+
 from commons.config import *
-from main import run_pipeline
+from commons.state_manager import PipelineStateManager
+from main import run_pipeline_safe
 
 from Batdongsan.orchestrator import (
     process_batdongsan_data 
@@ -37,6 +35,7 @@ scrape_state = {
 }
 
 scrape_lock = threading.Lock()
+scheduler = BackgroundScheduler(timezone="Asia/Ho_Chi_Minh")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -203,12 +202,67 @@ def extract_data(start_date, end_date, web):
     return_df.drop_duplicates(subset=dup, inplace=True)
     return return_df
 
-def weekly_pipeline():
+def retry_pipeline_job():
+    """Wrapper to call resume logic via Scheduler"""
+    print("Executing Retry Job...")
+    run_pipeline_wrapper(is_retry=True)
+
+def weekly_pipeline_job():
+    """Wrapper to call new run logic via Scheduler"""
+    print("Executing Weekly Job...")
+    run_pipeline_wrapper(is_retry=False)
+
+def run_pipeline_wrapper(is_retry=False):
     with scrape_lock:
         if scrape_state["running"]:
+            print("Pipeline already running. Skipping job.")
             return
         
         scrape_state["running"] = True
+        scrape_state["message"] = "Scraping (Retry)" if is_retry else "Scraping (Weekly)"
+        scrape_state["last_run"] = datetime.now().isoformat()
+
+    try:
+        success, reason = run_pipeline_safe(resume=is_retry)
+        
+        if success:
+            scrape_state["message"] = "Completed successfully"
+            # Reset retry count on success
+            PipelineStateManager().reset()
+        else:
+            scrape_state["message"] = f"Suspended: {reason}"
+            schedule_retry()
+
+    except Exception as e:
+        scrape_state["message"] = f"Failed: {e}"
+        traceback.print_exc()
+        schedule_retry()
+    finally:
+        scrape_state["running"] = False
+
+def schedule_retry():
+    """Schedules a retry in 1 hour if limits not exceeded."""
+    sm = PipelineStateManager()
+    current_retries = sm.increment_retry()
+    
+    if current_retries > 3: # Limit global retries
+        print("Max global retries (3) reached. Giving up.")
+        return
+
+    run_time = datetime.now() + timedelta(hours=1)
+    print(f"Scheduling retry #{current_retries} for {run_time.strftime('%H:%M:%S')}")
+    
+    scheduler.add_job(
+        retry_pipeline_job,
+        trigger=DateTrigger(run_date=run_time),
+        id=f"retry_{int(datetime.now().timestamp())}",
+        replace_existing=True
+    )
+
+# Start Scheduler
+scheduler.add_job(
+    weekly_pipeline_job,
+    CronTrigger(day_of_week='fri', hour=21, minute=0),
         scrape_state["message"] = "Scraping started"
 
         try:
@@ -221,38 +275,6 @@ def weekly_pipeline():
             traceback.print_exc()
         finally:
             scrape_state["running"] = False
-
-# def weekly_pipeline():
-#     with scrape_lock:
-#         if scrape_state["running"]:
-#             return
-
-#         scrape_state["running"] = True
-#         scrape_state["message"] = "Scraping started"
-
-#     try:
-#         # Step 1: scrape links
-#         scrape_state["message"] = "Scraping links..."
-#         run_scrape_urls()
-
-#         # Step 2: scrape details from link
-#         scrape_state["message"] = "Scraping details..."
-#         run_scrape_details()
-
-#         # Step 3: clean data
-#         scrape_state["message"] = "Cleaning data..."
-#         run_cleaning_pipeline(mode="house")
-
-#         scrape_state["last_run"] = datetime.now().isoformat()
-#         scrape_state["message"] = "Pipeline completed successfully"
-
-#     except Exception as e:
-#         scrape_state["message"] = "Pipeline failed"
-#         scrape_state["error"] = str(e)
-#         traceback.print_exc()
-
-#     finally:
-#         scrape_state["running"] = False
 
 def test_schedule():
     scrape_state['running'] = True
@@ -283,5 +305,4 @@ scheduler.add_job(
     id="weekly_scrape",
     replace_existing=True
 )
-
 scheduler.start()

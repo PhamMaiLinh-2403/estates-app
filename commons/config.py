@@ -31,13 +31,15 @@ SELENIUM_CONFIG = {
 # =============================================================================
 MAX_WORKERS = 4
 MAX_RETRIES = 3
-RETRY_DELAY = 2          # Delay khi bị hỏng connection và retry lại
-SELENIUM_WAIT_TIME = 5   # Delay khi mở web của Selenium để đỡ bị tranh tài nguyên
+RETRY_DELAY = 2          
+SELENIUM_WAIT_TIME = 5   
 
 START_PAGE_NUMBER = 1
 END_PAGE_NUMBER = 5
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
+
+THRESHOLD = 3 
 
 # =============================================================================
 # URL CONFIGURATION
@@ -57,6 +59,8 @@ SEARCH_PAGE_URL = {
 # =============================================================================
 BASE_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = BASE_DIR / "output"
+
+STATE_FILE = OUTPUT_DIR / "pipeline_state.json"
 
 TEMP_OUTPUT_DIR = OUTPUT_DIR / "temp_chunks"
 ADMIN_DATA_DIR = BASE_DIR / "Dữ liệu địa giới hành chính"

@@ -1,6 +1,5 @@
 import threading
 import queue
-import csv
 import pandas as pd 
 import numpy as np 
 
@@ -8,13 +7,14 @@ from commons.config import *
 from commons.utils import * 
 from commons.writers import *
 from commons.config import * 
+from commons.state_manager import CircuitBreaker, PipelineStateManager, PipelineStopException
 
 from .selenium_manager import *
 from .address_standardizer import AddressStandardizer 
 from .cleaning import DataCleaner, DataImputer, FeatureEngineer
 
-def scrape_urls_multithreaded():
-    """Phase 1: Scrape listing URLs from search pages."""
+def scrape_urls_multithreaded(circuit_breaker: CircuitBreaker, state_manager: PipelineStateManager):
+    """Phase 1: Scrape listing URLs."""
     url_queue = queue.Queue()
     stop_event = threading.Event()
     
@@ -24,13 +24,26 @@ def scrape_urls_multithreaded():
     )
     writer_thread.start()
 
-    page_ranges = split_page_ranges(START_PAGE_NUMBER, END_PAGE_NUMBER, MAX_WORKERS)
+    # Filter out pages already done
+    completed_pages = state_manager.get_completed_pages("Batdongsan")
+    all_pages = list(range(START_PAGE_NUMBER, END_PAGE_NUMBER + 1))
+    pending_pages = [p for p in all_pages if p not in completed_pages]
+
+    if not pending_pages:
+        print("[Batdongsan] All pages already scraped.")
+        url_queue.put(None)
+        writer_thread.join()
+        return
+
+    # Split pending pages among workers
+    page_chunks = list(chunks(pending_pages, MAX_WORKERS))
     
     threads = []
-    for worker_id, (start_page, end_page) in enumerate(page_ranges):
+    for worker_id, pages in enumerate(page_chunks):
+        if not pages: continue
         thread = threading.Thread(
             target=scrape_urls_worker,
-            args=(worker_id, SEARCH_PAGE_URL['Batdongsan'], start_page, end_page, url_queue)
+            args=(worker_id, SEARCH_PAGE_URL['Batdongsan'], pages, url_queue, circuit_breaker, state_manager)
         )
         threads.append(thread)
         thread.start()
@@ -41,28 +54,24 @@ def scrape_urls_multithreaded():
     url_queue.put(None)
     writer_thread.join()
     
-    print("\nURL collection completed.")
-
-
-def scrape_details_multithreaded():
-    """Phase 2: Scrape listing details from collected URLs."""
-    input_csv = URLS_CSV_PATH['Batdongsan']
+    if circuit_breaker.should_stop():
+        raise PipelineStopException(circuit_breaker.stop_reason)
     
-    if not input_csv.exists():
-        print(f"Error: {input_csv} not found. Run URL scraping first.")
+    print("\n[Batdongsan] URL collection completed.")
+
+
+def scrape_details_multithreaded(circuit_breaker: CircuitBreaker):
+    """Phase 2: Scrape details from collected URLs (Resumable)."""
+    state_manager = PipelineStateManager()
+    
+    # Get only URLs that haven't been scraped yet
+    urls_to_scrape = state_manager.get_pending_details_urls("Batdongsan")
+    
+    if not urls_to_scrape:
+        print("[Batdongsan] No pending URLs to scrape.")
         return
 
-    print(f"Reading URLs from {input_csv}...")
-    urls_to_scrape = []
-    try:
-        with open(input_csv, mode='r', encoding='utf-8-sig') as f:
-            reader = csv.DictReader(f)
-            urls_to_scrape = [row['url'] for row in reader if row and row.get('url')]
-    except Exception as e:
-        print(f"Error reading CSV: {e}")
-        return
-
-    print(f"Loaded {len(urls_to_scrape)} URLs.")
+    print(f"[Batdongsan] Resuming with {len(urls_to_scrape)} URLs.")
 
     data_queue = queue.Queue()
     stop_event = threading.Event()
@@ -77,12 +86,10 @@ def scrape_details_multithreaded():
     
     threads = []
     for worker_id, url_subset in enumerate(url_chunks):
-        if not url_subset:
-            continue
-        
+        if not url_subset: continue
         thread = threading.Thread(
             target=scrape_details_worker,
-            args=(worker_id, url_subset, data_queue)
+            args=(worker_id, url_subset, data_queue, circuit_breaker)
         )
         threads.append(thread)
         thread.start()
@@ -93,7 +100,10 @@ def scrape_details_multithreaded():
     data_queue.put(None)
     writer_thread.join()
 
-    print("\nDetail scraping completed.")
+    if circuit_breaker.should_stop():
+        raise PipelineStopException(circuit_breaker.stop_reason)
+
+    print("\n[Batdongsan] Detail scraping completed.")
 
 def process_batdongsan_data(raw_path=DETAILS_CSV_PATH['Batdongsan'], final_schema=FINAL_SCHEMA):
     """Orchestrate cleaning logic for Batdongsan data."""
