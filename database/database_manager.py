@@ -45,7 +45,7 @@ class DatabaseManager:
 
     def add_row_to_table(data_path, table_name):
         df = pd.read_csv(data_path)
-        df.replace(np.nan, '', inplace=True)
+        # df.replace(np.nan, '', inplace=True)
         try:
             df.drop(columns='scraping_time', inplace=True)
         except:

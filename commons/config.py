@@ -35,7 +35,7 @@ RETRY_DELAY = 2          # Delay khi bị hỏng connection và retry lại
 SELENIUM_WAIT_TIME = 5   # Delay khi mở web của Selenium để đỡ bị tranh tài nguyên
 
 START_PAGE_NUMBER = 1
-END_PAGE_NUMBER = 20 
+END_PAGE_NUMBER = 5
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 

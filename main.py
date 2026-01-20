@@ -61,10 +61,25 @@ def clean():
 
 
 def run_pipeline():
+    print("\n--- PHASE 1: SCRAPING ---")
+    
+    print("START SCRAPING URLS FOR BATDONGSAN...")
     scrape_urls_multithreaded()
+    print('Finished scraping URLs for Batdongsan.')
+    
+    print("START SCRAPING DETAILS FOR BATDONGSAN...")
     scrape_details_multithreaded()
+    print('Finished scraping details for Batdongsan.')
+    
+    print("START SCRAPING URLS FOR ONEHOUSING...")
     scrape_onehousing_urls()
+    print('Finished scraping URLs for Onehousing.')
+
+    print("START SCRAPING DETAILS FOR ONEHOUSING...")
     scrape_onehousing_details()
+    print('Finished scraping details for Onehousing.')
+    print("FINISHED SCRAPING ALL DATA.")
+
     clean()
 
 if __name__ == "__main__":
@@ -75,9 +90,21 @@ if __name__ == "__main__":
     if args.mode == "full":
         run_pipeline()
     elif args.mode == "scrape":
+        print("START SCRAPING URLS FOR BATDONGSAN...")
         scrape_urls_multithreaded()
+        print('Finished scraping URLs for Batdongsan.')
+        
+        print("START SCRAPING DETAILS FOR BATDONGSAN...")
         scrape_details_multithreaded()
+        print('Finished scraping details for Batdongsan.')
+        
+        print("START SCRAPING URLS FOR ONEHOUSING...")
         scrape_onehousing_urls()
+        print('Finished scraping URLs for Onehousing.')
+
+        print("START SCRAPING DETAILS FOR ONEHOUSING...")
         scrape_onehousing_details()
+        print('Finished scraping details for Onehousing.')
+        print("FINISHED SCRAPING ALL DATA.")
     elif args.mode == "clean":
         clean() 

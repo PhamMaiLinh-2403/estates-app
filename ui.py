@@ -274,11 +274,11 @@ def test_schedule():
 
 scheduler = BackgroundScheduler(timezone="Asia/Ho_Chi_Minh")
 scheduler.add_job(
-    test_schedule,
+    weekly_pipeline,
     CronTrigger(
-        day_of_week='fri',
-        hour=21,
-        minute=30
+        day_of_week='tue',
+        hour=15,
+        minute=11
     ),
     id="weekly_scrape",
     replace_existing=True
