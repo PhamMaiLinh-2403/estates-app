@@ -35,7 +35,7 @@ RETRY_DELAY = 2          # Delay khi bị hỏng connection và retry lại
 SELENIUM_WAIT_TIME = 5   # Delay khi mở web của Selenium để đỡ bị tranh tài nguyên
 
 START_PAGE_NUMBER = 1
-END_PAGE_NUMBER = 50
+END_PAGE_NUMBER = 20 
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 
@@ -91,6 +91,52 @@ SCRAPING_DETAILS_CONFIG = {
     "stagger_mode": "random",
     "stagger_step_sec": 3.0,
     "stagger_max_sec": 3.0,
+}
+
+# =============================================================================
+# CSV WRITER CONFIGURATION
+# =============================================================================
+CSV_WRITER_CONFIG = {
+    "url_batch_size": 10,
+    "details_batch_size": 5,
+    "encoding": "utf-8-sig",
+}
+
+# =============================================================================
+# DATA SCHEMA
+# =============================================================================
+FINAL_SCHEMA = {
+    "Tỉnh/Thành phố": "Tỉnh/Thành phố",
+    "Thành phố/Quận/Huyện/Thị xã": "Thành phố/Quận/Huyện/Thị xã",
+    "Xã/Phường/Thị trấn": "Xã/Phường/Thị trấn",
+    "Đường phố": "Đường phố",
+    "Chi tiết": "Chi tiết",
+    "Nguồn thông tin": "url",
+    "Tình trạng giao dịch": "Tình trạng giao dịch",
+    "Thời điểm giao dịch/rao bán": "Thời điểm giao dịch/rao bán",
+    "Thông tin liên hệ": "Thông tin liên hệ",
+    "Giá rao bán/giao dịch": "Giá rao bán/giao dịch",
+    "Giá ước tính": "Giá ước tính",
+    "Loại đơn giá (đ/m2 hoặc đ/m ngang)": "Loại đơn giá (đ/m2 hoặc đ/m ngang)",
+    "Đơn giá đất": "Đơn giá đất",
+    "Lợi thế kinh doanh": "Lợi thế kinh doanh",
+    "Số tầng công trình": "Số tầng công trình",
+    "Tổng diện tích sàn": "Tổng diện tích sàn",
+    "Đơn giá xây dựng": "Đơn giá xây dựng",
+    "Năm xây dựng": "Năm xây dựng",
+    "Chất lượng còn lại": "Chất lượng còn lại",
+    "Diện tích đất (m2)": "Diện tích đất (m2)",
+    "Kích thước mặt tiền (m)": "Kích thước mặt tiền (m)",
+    "Kích thước chiều dài (m)": "Kích thước chiều dài (m)",
+    "Số mặt tiền tiếp giáp": "Số mặt tiền tiếp giáp",
+    "Hình dạng": "Hình dạng",
+    "Độ rộng ngõ/ngách nhỏ nhất (m)": "Độ rộng ngõ/ngách nhỏ nhất (m)",
+    "Khoảng cách tới trục đường chính (m)": "Khoảng cách tới trục đường chính (m)",
+    "Mục đích sử dụng đất": "Mục đích sử dụng đất",
+    "Yếu tố khác": "description",
+    "Tọa độ (vĩ độ)": "latitude",
+    "Tọa độ (kinh độ)": "longitude",
+    "Hình ảnh của bài đăng": "image_urls",
 }
 
 # =============================================================================
