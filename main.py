@@ -21,6 +21,35 @@ from Onehousing.orchestrator import (
     process_onehousing_data
 )
 
+def cleanup_intermediate_files():
+    """
+    Deletes existing CSV files to prevent file bloat and data mixing 
+    before a new run. Preserves the SQLite database.
+    """
+    print("Cleaning up old CSV files...")
+    
+    # Collect all CSV paths from config
+    files_to_delete = []
+    
+    # Add URL CSVs
+    if isinstance(URLS_CSV_PATH, dict):
+        files_to_delete.extend(URLS_CSV_PATH.values())
+    
+    # Add Details CSVs
+    if isinstance(DETAILS_CSV_PATH, dict):
+        files_to_delete.extend(DETAILS_CSV_PATH.values())
+        
+    # Add Final Cleaned CSV
+    files_to_delete.append(CLEANED_CSV_PATH)
+    
+    for file_path in files_to_delete:
+        try:
+            if file_path.exists():
+                os.remove(file_path)
+                print(f"Deleted: {file_path}")
+        except Exception as e:
+            print(f"Warning: Could not delete {file_path}. Reason: {e}")
+
 def clean():
     print("\n--- PHASE 3: CLEANING & DATABASE SYNC ---")
     if not os.path.exists(DATABASE_DIR):
@@ -69,14 +98,15 @@ def run_pipeline_safe(resume=False):
 
     if not resume:
         print("Starting New Pipeline Run...")
-        state_manager.reset()
+        cleanup_intermediate_files() 
+        state_manager.reset_for_new_run()
     else:
         print("Resuming Pipeline...")
 
     try:
         # 1. Batdongsan
         scrape_bds_urls(circuit_breaker, state_manager)
-        scrape_bds_details(circuit_breaker) # state_manager implied for details diffing
+        scrape_bds_details(circuit_breaker) 
 
         # 2. Onehousing
         scrape_oh_urls(circuit_breaker, state_manager)
