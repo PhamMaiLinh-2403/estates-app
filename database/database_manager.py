@@ -1,6 +1,7 @@
 import sqlite3
 import time
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from contextlib import contextmanager
 from typing import List, Dict, Any, Optional
@@ -44,6 +45,7 @@ class DatabaseManager:
 
     def add_row_to_table(data_path, table_name):
         df = pd.read_csv(data_path)
+        # df.replace(np.nan, '', inplace=True)
         try:
             df.drop(columns='scraping_time', inplace=True)
         except:

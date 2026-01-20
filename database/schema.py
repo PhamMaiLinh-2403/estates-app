@@ -16,7 +16,7 @@ BDS_RAW_TABLE = """
     );
     """
 UNIQUE_INDEX_BDS_RAW = """
-    CREATE UNIQUE INDEX IF NOT EXISTS unique_index
+    CREATE UNIQUE INDEX IF NOT EXISTS index_bds_raw
     ON bds_raw(
     id,
     url,
@@ -49,7 +49,7 @@ ONEHOUSING_RAW_TABLE = """
     );
     """
 UNIQUE_INDEX_ONEHOUSING_RAW = """
-    CREATE UNIQUE INDEX IF NOT EXISTS unique_index
+    CREATE UNIQUE INDEX IF NOT EXISTS index_onehousing_raw
     ON onehousing_raw(
     property_id,
     property_url,
@@ -62,10 +62,11 @@ UNIQUE_INDEX_ONEHOUSING_RAW = """
     features, 
     latitude,
     longitude,
-    property_description,
     image_url
     );
     """
+# Đã bỏ property_description vì nó bị NaN hết trong Onehousing, nếu sửa được sẽ add thêm
+# Bỏ cả property_url vẫn không được
 
 CLEANED_TABLE = """
 CREATE TABLE IF NOT EXISTS cleaned(
@@ -105,13 +106,14 @@ CREATE TABLE IF NOT EXISTS cleaned(
 """
 
 UNIQUE_INDEX_CLEANED = """
-    CREATE UNIQUE INDEX IF NOT EXISTS unique_index
+    CREATE UNIQUE INDEX IF NOT EXISTS index_cleaned
     ON cleaned(
         "Tỉnh/Thành phố",  
         "Thành phố/Quận/Huyện/Thị xã",  
         "Xã/Phường/Thị trấn",  
         "Đường phố",  
-        "Giá rao bán/giao dịch",  
+        "Chi tiết",
+        "Giá rao bán/giao dịch", 
         "Số tầng công trình",  
         "Tổng diện tích sàn",  
         "Đơn giá xây dựng",  
@@ -123,5 +125,6 @@ UNIQUE_INDEX_CLEANED = """
         "Hình dạng",  
         "Độ rộng ngõ/ngách nhỏ nhất (m)",  
         "Khoảng cách tới trục đường chính (m)",  
-        "Mục đích sử dụng đất");
+        "Mục đích sử dụng đất",
+        Web);
 """

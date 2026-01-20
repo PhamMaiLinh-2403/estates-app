@@ -16,6 +16,14 @@ from commons.config import *
 from commons.state_manager import PipelineStateManager
 from main import run_pipeline_safe
 
+from Batdongsan.orchestrator import (
+    process_batdongsan_data 
+)
+
+from Onehousing.orchestrator import (
+    process_onehousing_data
+)
+
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 RESULT_STORE = {}
@@ -166,7 +174,32 @@ def extract_data(start_date, end_date, web):
 
         rows = cursor.fetchall()
 
+    dup = [
+        'Tỉnh/Thành phố', 
+        'Thành phố/Quận/Huyện/Thị xã', 
+        'Xã/Phường/Thị trấn', 
+        'Đường phố', 
+        'Giá rao bán/giao dịch', 
+        'Giá ước tính', 
+        'Số tầng công trình', 
+        'Tổng diện tích sàn', 
+        'Đơn giá xây dựng', 
+        'Chất lượng còn lại', 
+        'Diện tích đất (m2)', 
+        'Kích thước mặt tiền (m)', 
+        'Kích thước chiều dài (m)', 
+        'Số mặt tiền tiếp giáp', 
+        'Hình dạng', 
+        'Độ rộng ngõ/ngách nhỏ nhất (m)', 
+        'Khoảng cách tới trục đường chính (m)', 
+        'Mục đích sử dụng đất',
+        'Web',
+        'Đơn giá đất', 
+        'Lợi thế kinh doanh', 
+    ]
+
     return_df = pd.DataFrame(rows, columns=[column[0] for column in cursor.description])
+    return_df.drop_duplicates(subset=dup, inplace=True)
     return return_df
 
 def retry_pipeline_job():
@@ -230,6 +263,45 @@ def schedule_retry():
 scheduler.add_job(
     weekly_pipeline_job,
     CronTrigger(day_of_week='fri', hour=21, minute=0),
+        scrape_state["message"] = "Scraping started"
+
+        try:
+            run_pipeline()
+            scrape_state['last_run'] = datetime.now().isoformat()
+            scrape_state['message'] = "Pipeline completed successfully"
+        except Exception as e:
+            scrape_state["message"] = "Pipeline failed"
+            print(f'Pipeline stopped with error: {e}')
+            traceback.print_exc()
+        finally:
+            scrape_state["running"] = False
+
+def test_schedule():
+    scrape_state['running'] = True
+
+    print("Cleaning data...")
+    df_bds_clean = process_batdongsan_data()
+    df_bds_clean['Web'] = 'Batdongsan'
+    df_oh_clean = process_onehousing_data()
+    df_oh_clean['Web'] = 'Onehousing'
+    df_oh_clean['Thời điểm giao dịch/rao bán'] = datetime.now().strftime("%d/%m/%Y")
+    
+    df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
+    print(f"Batdongsan original shape: {df_bds_clean.shape}")
+    print(f"Onehousing original shape: {df_oh_clean.shape}")
+    print(f'Final shape: {df_cleaned.shape}')
+    print(f'Columns: {df_cleaned.columns}')
+    
+    scrape_state['running'] = False
+
+scheduler = BackgroundScheduler(timezone="Asia/Ho_Chi_Minh")
+scheduler.add_job(
+    weekly_pipeline,
+    CronTrigger(
+        day_of_week='tue',
+        hour=15,
+        minute=11
+    ),
     id="weekly_scrape",
     replace_existing=True
 )
