@@ -265,18 +265,27 @@ def schedule_retry():
 scheduler.add_job(
     weekly_pipeline_job,
     CronTrigger(day_of_week='fri', hour=21, minute=0),
-        scrape_state["message"] = "Scraping started"
+    id="weekly_scrape",
+    replace_existing=True
+)
 
-        try:
-            run_pipeline()
-            scrape_state['last_run'] = datetime.now().isoformat()
-            scrape_state['message'] = "Pipeline completed successfully"
-        except Exception as e:
-            scrape_state["message"] = "Pipeline failed"
-            print(f'Pipeline stopped with error: {e}')
-            traceback.print_exc()
-        finally:
-            scrape_state["running"] = False
+def weekly_pipeline():
+    if scrape_state['running']:
+        return
+    
+    scrape_state['running'] = True
+    scrape_state["message"] = "Scraping started"
+
+    try:
+        run_pipeline()
+        scrape_state['last_run'] = datetime.now().isoformat()
+        scrape_state['message'] = "Pipeline completed successfully"
+    except Exception as e:
+        scrape_state["message"] = "Pipeline failed"
+        print(f'Pipeline stopped with error: {e}')
+        traceback.print_exc()
+    finally:
+        scrape_state["running"] = False
 
 def test_schedule():
     scrape_state['running'] = True
