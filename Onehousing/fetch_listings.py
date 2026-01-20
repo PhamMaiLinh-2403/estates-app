@@ -1,4 +1,5 @@
 import json
+import re
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -87,12 +88,17 @@ def extract_listing_details(driver, url):
 
         # Extract description
         try:
-            desc_divs = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="property-description"]')
-            if desc_divs and desc_divs[0].text:
-                data["property_description"] = [desc_divs[0].text.strip()]
-            else:
-                desc_elements = driver.find_elements(By.CSS_SELECTOR, 'ul[aria-label="description-heading"].relative li')
-                data["property_description"] = [li.text.strip() for li in desc_elements if li.text.strip()]
+            title_meta = driver.find_element(By.CSS_SELECTOR, "span[data-testid='seo-title-meta']").text.strip()
+            description_meta = driver.find_element(By.CSS_SELECTOR, "span[data-testid='seo-description-meta']").text.strip()
+
+            description_list = driver.find_element(By.XPATH, "//ul[@aria-label='description-heading']")
+            li_elements = description_list.find_elements(By.TAG_NAME, "li")
+            li_texts = [li.text.strip() for li in li_elements]
+
+            full_description = " ".join([title_meta, description_meta] + li_texts)
+            full_description = re.sub(r"\s+", " ", full_description).strip()
+
+            data["property_description"] = full_description 
         except:
             pass
         
