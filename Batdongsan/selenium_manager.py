@@ -1,6 +1,5 @@
 import time 
 import random
-import queue 
 from seleniumbase import Driver
 
 from commons.config import *
@@ -22,38 +21,41 @@ def create_stealth_driver(headless: bool = True) -> Driver:
     return driver
 
 
-def scrape_urls_worker(worker_id: int, search_page_url: str, start_page: int, 
-                       end_page: int, url_queue: queue.Queue) -> None: 
-    """Worker to scrape a range of pagination pages and push results to queue."""
-    time.sleep(worker_id * 2.0) 
-    
-    print(f"[Worker {worker_id}] Scraping pages {start_page} to {end_page}")
-    
+def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
+    """Wrapper to handle specific pages list instead of range."""
+    time.sleep(worker_id * 1.0)
     driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
     scraper = Scraper(driver)
-
+    
     try:
-        for i in range(start_page, end_page + 1):
-            current_url = build_page_url(search_page_url, i)
-            new_urls = scraper.scrape_single_page(current_url)
+        for page in pages:
+            if cb.should_stop(): 
+                break
             
-            if new_urls:
-                url_queue.put(new_urls)
-                print(f"[Worker {worker_id}] Page {i}: Found {len(new_urls)} URLs")
-            else:
-                print(f"[Worker {worker_id}] Page {i}: No URLs found")
-
-    except Exception as e:
-        print(f"[Worker {worker_id}] Error: {e}")
+            try:
+                current_url = build_page_url(url, page)
+                new_urls = scraper.scrape_single_page(current_url)
+                
+                if new_urls:
+                    q.put(new_urls)
+                    cb.record_success()
+                    sm.mark_page_complete("Batdongsan", page)
+                    print(f"[Worker {worker_id}] Page {page}: Found {len(new_urls)}")
+                else:
+                    print(f"[Worker {worker_id}] Page {page}: No URLs found")
+                    # Empty page is not a failure, just empty.
+            except (ConnectionRefusedError, MemoryError) as e:
+                cb.record_failure(str(e))
+                break
+            except Exception as e:
+                cb.record_failure(str(e))
     finally:
         driver.quit()
 
 
-def scrape_details_worker(worker_id: int, url_subset: list[str], data_queue: queue.Queue):
-    """Worker that scrapes listing details and pushes them to queue."""
-    base = SCRAPING_DETAILS_CONFIG.get("stagger_step_sec", 2.0)
-    start_delay = worker_id * base
-    print(f"[Worker {worker_id}] Sleeping {start_delay:.1f}s before start")
+def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
+    """Worker with Circuit Breaker integration."""
+    start_delay = worker_id * 2.0
     time.sleep(start_delay)
 
     driver = None
@@ -61,32 +63,36 @@ def scrape_details_worker(worker_id: int, url_subset: list[str], data_queue: que
         driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
         scraper = Scraper(driver)
         
-        print(f"[Worker {worker_id}] Processing {len(url_subset)} URLs")
-
         for idx, url in enumerate(url_subset, 1):
-            print(f"[Worker {worker_id}] {idx}/{len(url_subset)} → {url}")
-            
+            if circuit_breaker.should_stop():
+                print(f"[Worker {worker_id}] Stop signal received.")
+                break
+
             try:
                 data = scraper.scrape_listing_details(url)
 
                 if data:
                     data['scraping_time'] = int(time.time())
                     data_queue.put(data)
+                    circuit_breaker.record_success()
+                else:
+                    # Item-level fail (3 internal retries failed)
+                    # We record a failure to the stage-level breaker
+                    circuit_breaker.record_failure("ItemFailed3Times")
+                    print(f"[Worker {worker_id}] Failed item {url}")
 
+            except (ConnectionRefusedError, MemoryError) as e:
+                circuit_breaker.record_failure(str(e))
+                break
             except Exception as e:
-                print(f"[Worker {worker_id}] Error: {e}")
-                continue
+                circuit_breaker.record_failure(str(e))
             
+            # Stagger logic
             if SCRAPING_DETAILS_CONFIG["stagger_mode"] == "random":
-                delay = random.uniform(
-                    SCRAPING_DETAILS_CONFIG["stagger_step_sec"],
-                    SCRAPING_DETAILS_CONFIG["stagger_max_sec"],
-                )
-                time.sleep(delay)
+                time.sleep(random.uniform(SCRAPING_DETAILS_CONFIG["stagger_step_sec"], SCRAPING_DETAILS_CONFIG["stagger_max_sec"]))
         
     except Exception as e:
-        print(f"[Worker {worker_id}] Fatal error: {e}")
-        
+        print(f"[Worker {worker_id}] Fatal: {e}")
     finally:
-        if driver:
+        if driver: 
             driver.quit()

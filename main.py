@@ -1,81 +1,108 @@
 import argparse
 import pandas as pd
 import os
-import sqlite3
 from datetime import datetime
+import traceback
 
 from commons.config import *
+from commons.state_manager import PipelineStateManager, CircuitBreaker, PipelineStopException
 from database.database_manager import DatabaseManager
 from database.schema import *
 
 from Batdongsan.orchestrator import (
-    scrape_urls_multithreaded, 
-    scrape_details_multithreaded,
+    scrape_urls_multithreaded as scrape_bds_urls, 
+    scrape_details_multithreaded as scrape_bds_details,
     process_batdongsan_data 
 )
 
 from Onehousing.orchestrator import (
-    scrape_onehousing_urls, 
-    scrape_onehousing_details,
+    scrape_onehousing_urls as scrape_oh_urls, 
+    scrape_onehousing_details as scrape_oh_details,
     process_onehousing_data
 )
 
 def clean():
-    print("\n--- PHASE 2: CLEANING & DATABASE SYNC ---")
+    print("\n--- PHASE 3: CLEANING & DATABASE SYNC ---")
     if not os.path.exists(DATABASE_DIR):
         DatabaseManager.create_db() 
 
-    # Add raw data
-    print("Adding raw data...")
+    # Add raw data (Ignore duplicates handled by SQL)
     try:
-        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
-        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
-    except sqlite3.OperationalError as e:
-        print(f"Error adding raw data: {e}")
-        DatabaseManager.create_db()
-        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
-        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
-    print("Finished adding raw data!")
+        if DETAILS_CSV_PATH['Batdongsan'].exists():
+            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
+        if DETAILS_CSV_PATH['Onehousing'].exists():
+            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
+    except Exception as e:
+        print(f"Error syncing raw data: {e}")
 
     # Clean data
-    print("Cleaning data...")
-    df_bds_clean = process_batdongsan_data()
-    df_bds_clean['Web'] = 'Batdongsan'
-    df_oh_clean = process_onehousing_data()
-    df_oh_clean['Web'] = 'Onehousing'
-    df_oh_clean['Thời điểm giao dịch/rao bán'] = datetime.now().strftime("%d/%m/%Y")
+    try:
+        df_bds_clean = process_batdongsan_data()
+        if not df_bds_clean.empty:
+            df_bds_clean['Web'] = 'Batdongsan'
+        
+        df_oh_clean = process_onehousing_data()
+        if not df_oh_clean.empty:
+            df_oh_clean['Web'] = 'Onehousing'
+            df_oh_clean['Thời điểm giao dịch/rao bán'] = datetime.now().strftime("%d/%m/%Y")
 
-    # print(f'BDS: {df_bds_clean.columns}')
-    # print(f'OH: {df_oh_clean.columns}')
+        df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
+        
+        if not df_cleaned.empty:
+            df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
+            DatabaseManager.add_row_to_table(CLEANED_CSV_PATH, "cleaned")
+            print("Finished cleaning data!")
+        else:
+            print("No cleaned data produced.")
+            
+    except Exception as e:
+        print(f"Cleaning error: {e}")
+        traceback.print_exc()
 
-    df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
-    print(f"Batdongsan original shape: {df_bds_clean.shape}")
-    print(f"Onehousing original shape: {df_oh_clean.shape}")
-    print(f'Final shape: {df_cleaned.shape}')
-    print(f'Columns: {df_cleaned.columns}')
-    df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
-    DatabaseManager.add_row_to_table(CLEANED_CSV_PATH, "cleaned")
-    print("Finished cleaning data!")
 
+def run_pipeline_safe(resume=False):
+    """
+    Runs the pipeline with fault tolerance.
+    """
+    state_manager = PipelineStateManager()
+    circuit_breaker = CircuitBreaker() 
 
-def run_pipeline():
-    scrape_urls_multithreaded()
-    scrape_details_multithreaded()
-    scrape_onehousing_urls()
-    scrape_onehousing_details()
-    clean()
+    if not resume:
+        print("Starting New Pipeline Run...")
+        state_manager.reset()
+    else:
+        print("Resuming Pipeline...")
+
+    try:
+        # 1. Batdongsan
+        scrape_bds_urls(circuit_breaker, state_manager)
+        scrape_bds_details(circuit_breaker) # state_manager implied for details diffing
+
+        # 2. Onehousing
+        scrape_oh_urls(circuit_breaker, state_manager)
+        scrape_oh_details(circuit_breaker)
+
+        # 3. Clean (Only if scraping survived)
+        clean()
+        
+        return True, "Completed"
+
+    except PipelineStopException as e:
+        print(f"\n[!!!] Pipeline Stopped: {e}")
+        return False, str(e)
+    except Exception as e:
+        print(f"\n[!!!] Unexpected Error: {e}")
+        traceback.print_exc()
+        return False, str(e)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Vietnamese Real Estate Pipeline")
-    parser.add_argument("--mode", choices=["full", "scrape", "clean"], default="full")
+    parser.add_argument("--mode", choices=["full", "clean"], default="full")
+    parser.add_argument("--resume", action="store_true", help="Resume from last state")
     args = parser.parse_args()
 
     if args.mode == "full":
-        run_pipeline()
-    elif args.mode == "scrape":
-        scrape_urls_multithreaded()
-        scrape_details_multithreaded()
-        scrape_onehousing_urls()
-        scrape_onehousing_details()
+        success, msg = run_pipeline_safe(resume=args.resume)
+        print(f"Pipeline Result: {msg}")
     elif args.mode == "clean":
-        clean() 
+        clean()

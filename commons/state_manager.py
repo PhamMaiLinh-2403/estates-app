@@ -132,3 +132,7 @@ class PipelineStateManager:
         self.state["last_run_status"] = "completed"
         self.state["retry_count"] = 0
         self.save_state()
+
+class PipelineStopException(Exception):
+    """Custom exception to halt the pipeline gracefully."""
+    pass
