@@ -45,8 +45,8 @@ def clean():
     df_oh_clean['Web'] = 'Onehousing'
     df_oh_clean['Thời điểm giao dịch/rao bán'] = datetime.now().strftime("%d/%m/%Y")
 
-    print(f'BDS: {df_bds_clean.columns}')
-    print(f'OH: {df_oh_clean.columns}')
+    # print(f'BDS: {df_bds_clean.columns}')
+    # print(f'OH: {df_oh_clean.columns}')
 
     df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
     print(f"Batdongsan original shape: {df_bds_clean.shape}")

@@ -166,7 +166,7 @@ def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schem
         'Đường phố',
         'Chi tiết',
         'Nguồn thông tin', 
-        'Thời điểm giao dịch/rao bán',
+        # 'Thời điểm giao dịch/rao bán',
         'Giá rao bán/giao dịch',
         'Giá ước tính',
         'Số tầng công trình', 
@@ -207,11 +207,13 @@ def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schem
 
     old_size = oh_final.shape[0]
     oh_final.drop_duplicates(subset=dup, inplace=True)
-    oh_final.reset_index(drop=True)
     print(f'Dropped {old_size - oh_final.shape[0]} duplicated rows for Onehousing.')
+
+    print(oh_final.info())
 
     old_size = oh_final.shape[0]  
     oh_final.dropna(subset=na, inplace=True)
+    oh_final.reset_index(drop=True)
     print(f'Dropped {old_size - oh_final.shape[0]} NaN rows for Onehousing.')
 
     print(f'Final number of rows for Onehousing: {oh_final.shape[0]}')

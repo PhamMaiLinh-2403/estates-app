@@ -49,7 +49,6 @@ class DatabaseManager:
         except:
             pass
         cols = list(df.columns)
-        print(cols)
         placeholders = ",".join(["?"] * (len(cols)))
         quoted_cols = ",".join(f'"{col}"' for col in cols)
 
