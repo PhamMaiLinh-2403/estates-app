@@ -134,22 +134,21 @@ if __name__ == "__main__":
     if args.mode == "full":
         success, msg = run_pipeline_safe(resume=args.resume)
         print(f"Pipeline Result: {msg}")
-#         run_pipeline()
     elif args.mode == "scrape":
         print("START SCRAPING URLS FOR BATDONGSAN...")
-        scrape_urls_multithreaded()
+        scrape_bds_urls()
         print('Finished scraping URLs for Batdongsan.')
         
         print("START SCRAPING DETAILS FOR BATDONGSAN...")
-        scrape_details_multithreaded()
+        scrape_bds_details()
         print('Finished scraping details for Batdongsan.')
         
         print("START SCRAPING URLS FOR ONEHOUSING...")
-        scrape_onehousing_urls()
+        scrape_oh_urls()
         print('Finished scraping URLs for Onehousing.')
 
         print("START SCRAPING DETAILS FOR ONEHOUSING...")
-        scrape_onehousing_details()
+        scrape_oh_details()
         print('Finished scraping details for Onehousing.')
         print("FINISHED SCRAPING ALL DATA.")
     elif args.mode == "clean":

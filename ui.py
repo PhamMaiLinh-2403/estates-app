@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+
 from io import BytesIO
 import uuid
 import pandas as pd
@@ -277,7 +278,7 @@ def weekly_pipeline():
     scrape_state["message"] = "Scraping started"
 
     try:
-        run_pipeline()
+        run_pipeline_safe()
         scrape_state['last_run'] = datetime.now().isoformat()
         scrape_state['message'] = "Pipeline completed successfully"
     except Exception as e:
