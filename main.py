@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import os
+import sqlite3
 from datetime import datetime
 
 from commons.config import *
@@ -26,8 +27,14 @@ def clean():
 
     # Add raw data
     print("Adding raw data...")
-    DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
-    DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
+    try:
+        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
+        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
+    except sqlite3.OperationalError as e:
+        print(f"Error adding raw data: {e}")
+        DatabaseManager.create_db()
+        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
+        DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
     print("Finished adding raw data!")
 
     # Clean data
