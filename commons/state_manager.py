@@ -133,6 +133,22 @@ class PipelineStateManager:
         self.state["retry_count"] = 0
         self.save_state()
 
+    def is_suspended(self):
+        """Checks if the previous run crashed or was suspended."""
+        return self.state.get("last_run_status") == "suspended"
+
+    def reset(self):
+        """Resets retry count after a successful run."""
+        self.state["retry_count"] = 0
+        self.state["last_run_status"] = "idle" # or completed
+        self.save_state()
+
+    def increment_retry(self):
+        """Increments retry count and returns current value."""
+        self.state["retry_count"] = self.state.get("retry_count", 0) + 1
+        self.save_state()
+        return self.state["retry_count"]
+
 class PipelineStopException(Exception):
     """Custom exception to halt the pipeline gracefully."""
     pass

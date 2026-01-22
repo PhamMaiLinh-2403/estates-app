@@ -62,3 +62,74 @@ class DatabaseManager:
         with sqlite3.connect(DATABASE_DIR) as conn:
             conn.executemany(sql_statement, df.itertuples(index=False, name=None))
             conn.commit()
+
+    def extract_data(start_date, end_date, web):
+        # start_date = datetime.strptime(start_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+        # end_date = datetime.strptime(end_date, "%d/%m/%Y").strftime("%Y-%m-%d")
+
+        with sqlite3.connect(DATABASE_DIR) as conn:
+            cursor = conn.cursor()
+            
+            if web == 'Cả hai':
+                sql_statement = """
+                            SELECT *
+                            FROM cleaned
+                            WHERE
+                            date(
+                                substr("Thời điểm giao dịch/rao bán", 7, 4) || '-' ||
+                                substr("Thời điểm giao dịch/rao bán", 4, 2) || '-' ||
+                                substr("Thời điểm giao dịch/rao bán", 1, 2)
+                            )
+                            BETWEEN date(?) AND date(?)
+                            """
+                cursor.execute(
+                    sql_statement,
+                    (start_date, end_date))
+            else:
+                sql_statement = """
+                                SELECT *
+                                FROM cleaned
+                                WHERE
+                                date(
+                                    substr("Thời điểm giao dịch/rao bán", 7, 4) || '-' ||
+                                    substr("Thời điểm giao dịch/rao bán", 4, 2) || '-' ||
+                                    substr("Thời điểm giao dịch/rao bán", 1, 2)
+                                )
+                                BETWEEN date(?) AND date(?)
+                                AND Web = (?)
+                                """
+            
+                cursor.execute(
+                    sql_statement,
+                    (start_date, end_date, web)
+                )
+
+            rows = cursor.fetchall()
+
+        dup = [
+            'Tỉnh/Thành phố', 
+            'Thành phố/Quận/Huyện/Thị xã', 
+            'Xã/Phường/Thị trấn', 
+            'Đường phố', 
+            'Giá rao bán/giao dịch', 
+            'Giá ước tính', 
+            'Số tầng công trình', 
+            'Tổng diện tích sàn', 
+            'Đơn giá xây dựng', 
+            'Chất lượng còn lại', 
+            'Diện tích đất (m2)', 
+            'Kích thước mặt tiền (m)', 
+            'Kích thước chiều dài (m)', 
+            'Số mặt tiền tiếp giáp', 
+            'Hình dạng', 
+            'Độ rộng ngõ/ngách nhỏ nhất (m)', 
+            'Khoảng cách tới trục đường chính (m)', 
+            'Mục đích sử dụng đất',
+            'Web',
+            'Đơn giá đất', 
+            'Lợi thế kinh doanh', 
+        ]
+
+        return_df = pd.DataFrame(rows, columns=[column[0] for column in cursor.description])
+        return_df.drop_duplicates(subset=dup, inplace=True)
+        return return_df

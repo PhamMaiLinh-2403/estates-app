@@ -51,7 +51,6 @@ def cleanup_intermediate_files():
             print(f"Warning: Could not delete {file_path}. Reason: {e}")
 
 def clean():
-    print("\n--- PHASE 3: CLEANING & DATABASE SYNC ---")
     if not os.path.exists(DATABASE_DIR):
         DatabaseManager.create_db() 
 
@@ -150,6 +149,7 @@ if __name__ == "__main__":
         print("START SCRAPING DETAILS FOR ONEHOUSING...")
         scrape_oh_details()
         print('Finished scraping details for Onehousing.')
+
         print("FINISHED SCRAPING ALL DATA.")
     elif args.mode == "clean":
         clean()

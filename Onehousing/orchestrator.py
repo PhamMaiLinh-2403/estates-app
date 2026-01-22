@@ -63,7 +63,8 @@ def scrape_onehousing_urls(circuit_breaker: CircuitBreaker, state_manager: Pipel
 
 def onehousing_url_worker(worker_id: int, page_range: List[int], url_queue: queue.Queue, cb: CircuitBreaker, sm: PipelineStateManager):
     for page_num in page_range:
-        if cb.should_stop(): break
+        if cb.should_stop(): 
+            break
 
         try:
             ua = get_random_user_agent()
@@ -130,7 +131,8 @@ def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.
     try:
         driver = create_driver(headless=True)
         for idx, url in enumerate(urls):
-            if cb.should_stop(): break
+            if cb.should_stop(): 
+                break
 
             try:
                 data = extract_listing_details(driver, url)
