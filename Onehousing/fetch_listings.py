@@ -88,22 +88,36 @@ def extract_listing_details(driver, url):
 
         # Extract description
         try:
-            title_meta = driver.find_element(By.CSS_SELECTOR, "span[data-testid='seo-title-meta']").text.strip()
-            description_meta = driver.find_element(By.CSS_SELECTOR, "span[data-testid='seo-description-meta']").text.strip()
+            title_meta = driver.find_element(
+                By.CSS_SELECTOR,
+                "span[data-testid='seo-title-meta']"
+            ).text.strip()
 
-            description_list = driver.find_element(By.XPATH, "//ul[@aria-label='description-heading']")
-            li_elements = description_list.find_elements(By.TAG_NAME, "li")
-            li_texts = [li.text.strip() for li in li_elements]
+            description_meta = driver.find_element(
+                By.CSS_SELECTOR,
+                "span[data-testid='seo-description-meta']"
+            ).text.strip()
 
-            full_description = " ".join([title_meta, description_meta] + li_texts)
+            li_texts = driver.execute_script("""
+                const ul = document.querySelector("ul[aria-label='description-heading']");
+                if (!ul) return [];
+                return Array.from(ul.querySelectorAll("li"))
+                    .map(li => li.innerText.trim())
+                    .filter(Boolean);
+            """)
+
+            full_description = " ".join(
+                [title_meta, description_meta] + li_texts
+            )
             full_description = re.sub(r"\s+", " ", full_description).strip()
 
-            data["property_description"] = full_description 
-        except:
+            data["property_description"] = full_description
+
+        except Exception:
             pass
         
         data["features"] = "; ".join(data["features"])
-        data["property_description"] = ". ".join(data["property_description"])
+        data["property_description"] = "".join(data["property_description"])
         
         return data
 

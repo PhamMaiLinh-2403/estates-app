@@ -33,7 +33,7 @@ class OneHousingDataCleaner:
 
         title = row.get('listing_title', '')
         if pd.notna(title):
-            return title.split(",")[-2].replace('TP.').replace('Q.', "Quận").replace('H.', "Huyện").replace('TX.', 'Thị xã').strip()
+            return title.split(",")[-2].replace('TP.', "Thành phố").replace('Q.', "Quận").replace('H.', "Huyện").replace('TX.', 'Thị xã').strip()
         return np.nan
 
     @staticmethod
