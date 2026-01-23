@@ -62,7 +62,7 @@ class PipelineStateManager:
         return {
             "batdongsan_url_pages": [],
             "onehousing_url_pages": [],
-            "last_run_status": "completed", # running (đang chạy), suspended (bị chặn), completed (hoàn thành)
+            "last_run_status": "idle", # idle, running, suspended, completed
             "retry_count": 0
         }
     
@@ -103,7 +103,7 @@ class PipelineStateManager:
         if detail_csv.exists():
             try:
                 # Only read relevant columns to save memory
-                df_details = pd.read_csv(detail_csv, usecols=['url', 'property_url'])
+                df_details = pd.read_csv(detail_csv)
                 # Handle different column names between sites
                 if 'url' in df_details.columns:
                     done_urls.update(df_details['url'].dropna().unique())
