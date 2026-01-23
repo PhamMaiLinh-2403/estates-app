@@ -95,7 +95,7 @@ def run_pipeline_safe(resume=False):
     state_manager = PipelineStateManager()
     circuit_breaker = CircuitBreaker() 
 
-    if not resume:
+    if not resume: # Nếu resume == False
         print("Starting New Pipeline Run...")
         cleanup_intermediate_files() 
         state_manager.reset_for_new_run()
@@ -104,15 +104,25 @@ def run_pipeline_safe(resume=False):
 
     try:
         # 1. Batdongsan
+        print("START SCRAPING URLS FOR BATDONGSAN...")
         scrape_bds_urls(circuit_breaker, state_manager)
+        print('Finished scraping URLs for Batdongsan.')
+        print("START SCRAPING DETAILS FOR BATDONGSAN...")
         scrape_bds_details(circuit_breaker) 
+        print('Finished scraping details for Batdongsan.')
 
         # 2. Onehousing
+        print("START SCRAPING URLS FOR ONEHOUSING...")
         scrape_oh_urls(circuit_breaker, state_manager)
+        print('Finished scraping URLs for Onehousing.')
+        print("START SCRAPING DETAILS FOR ONEHOUSING...")
         scrape_oh_details(circuit_breaker)
+        print('Finished scraping details for Onehousing.')
 
+        print('FINISHED SCRAPING ALL DATA. START CLEANING...')
         # 3. Clean (Only if scraping survived)
         clean()
+        print('FINISHED CLEANING.')
         
         return True, "Completed"
 

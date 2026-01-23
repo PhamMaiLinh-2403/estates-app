@@ -8,6 +8,8 @@ import pandas as pd
 import threading
 import traceback
 from datetime import datetime, timedelta
+import warnings
+warnings.filterwarnings("ignore")
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -137,7 +139,7 @@ scheduler.add_job(
     weekly_pipeline_job,
     CronTrigger(day_of_week='fri', hour=21, minute=0),
     id="weekly_scrape",
-    replace_existing=True
+    # replace_existing=True # Muốn thay thế thì phải có cùng ID. Trong trường hợp này, CronTrigger sẽ không thay thế DateTrigger mà sẽ chạy song song với nó
 )
 
 # Start Scheduler
@@ -197,6 +199,18 @@ async def submit(
             # "scraped_data": df
         }
     )
+
+@app.get("/job/{job_id}")
+def job_status(job_id: str):
+    df = RESULT_STORE[job_id]
+
+    if df.shape[0] == 0:
+        return {"status": "failed"}
+
+    return {
+        "status": "done",
+        "row_count": int(df.shape[0])
+    }
 
 @app.get("/download/{job_id}")
 async def download(job_id: str):

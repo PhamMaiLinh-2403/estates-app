@@ -62,7 +62,7 @@ class PipelineStateManager:
         return {
             "batdongsan_url_pages": [],
             "onehousing_url_pages": [],
-            "last_run_status": "idle", # idle, running, suspended, completed
+            "last_run_status": "completed", # running (đang chạy), suspended (bị chặn), completed (hoàn thành)
             "retry_count": 0
         }
     
