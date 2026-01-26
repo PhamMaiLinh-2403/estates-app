@@ -211,21 +211,3 @@ WantedBy=multi-user.target
 sudo systemctl enable realestate_scraper
 sudo systemctl start realestate_scraper
 ```
-
----
-
-## Xử lý sự cố (Troubleshooting)
-
-* **Lỗi: `Message: unknown error: Chrome failed to start`**
-
-  * Đảm bảo Chrome đã được cài.
-  * Nếu chạy bằng root, cần bật `--no-sandbox` (cấu hình trong `commons/config.py`).
-  * Với server headless, đảm bảo `headless=True`.
-
-* **Scraping tự dưng dừng**
-
-  * Kiểm tra `output/pipeline_state.json`. Nếu `last_run_status` là `"suspended"`, circuit breaker đã kích hoạt do bị chặn mạng hoặc rate limit. Chạy lại với `--resume` hoặc chờ scheduler tự động.
-
-* **Chuẩn hóa địa chỉ kém**
-
-  * Kiểm tra các file SQL trong `Dữ liệu địa giới hành chính` có mới và đầy đủ không. Engine chuẩn hóa phụ thuộc rất nhiều vào việc match chính xác Quận/Phường.
