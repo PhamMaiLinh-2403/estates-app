@@ -28,6 +28,7 @@ Hệ thống sử dụng **Selenium** (thông qua `seleniumbase` để né bot d
 
 ## Cấu trúc dự án
 
+```text
 ├── Batdongsan/               # Logic riêng cho Batdongsan
 │   ├── orchestrator.py       # Điều phối luồng xử lý
 │   ├── selenium_manager.py   # Quản lý worker & khởi tạo driver
@@ -37,7 +38,7 @@ Hệ thống sử dụng **Selenium** (thông qua `seleniumbase` để né bot d
 │   ├── fetch_listings.py     # Logic parse dữ liệu
 │   └── ...
 ├── commons/                  # Tiện ích dùng chung
-│   ├── config.py             # Cấu hình toàn cục (Path, URL,...)
+│   ├── config.py             # Cấu hình toàn cục (Path, URL, Ngưỡng)
 │   ├── state_manager.py      # Circuit Breaker & Resume
 │   ├── writers.py            # Ghi/đọc CSV
 │   └── retry.py              # Decorator retry
@@ -50,6 +51,7 @@ Hệ thống sử dụng **Selenium** (thông qua `seleniumbase` để né bot d
 ├── main.py                   # Entry point CLI
 ├── ui.py                     # Entry point Web Server & Scheduler
 └── address_standardizer.py   # Logic match địa chỉ cốt lõi
+```
 
 ---
 
@@ -227,13 +229,3 @@ sudo systemctl start realestate_scraper
 * **Chuẩn hóa địa chỉ kém**
 
   * Kiểm tra các file SQL trong `Dữ liệu địa giới hành chính` có mới và đầy đủ không. Engine chuẩn hóa phụ thuộc rất nhiều vào việc match chính xác Quận/Phường.
-
----
-
-Nếu bạn muốn, mình có thể:
-
-* Viết lại README theo **giọng kỹ thuật hơn / marketing hơn**
-* Tách README cho **User vs Host**
-* Chuẩn hóa thuật ngữ tiếng Việt (phường/xã, quận/huyện, v.v.)
-
-Cứ nói nhé 👌
