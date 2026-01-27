@@ -4,7 +4,7 @@
 
 Dự án này là một **pipeline dữ liệu**, được thiết kế để **thu thập (scrape), làm sạch, chuẩn hóa và lưu trữ** dữ liệu tin đăng bất động sản từ các nền tảng lớn tại Việt Nam (**Batdongsan** và **Onehousing**).
 
-Hệ thống sử dụng **Selenium** (thông qua `seleniumbase` để né bot detection) cho việc scrape, **Pandas** cho xử lý dữ liệu chuyên sâu, **SQLite** để lưu trữ và **FastAPI** để xây dựng giao diện quản lý web. Pipeline có tích hợp **lập lịch tự động** và **circuit breaker** để xử lý lỗi.
+Hệ thống sử dụng **Selenium** (thông qua `seleniumbase` để tránh bot detection) cho việc scrape, **Pandas** cho xử lý dữ liệu chuyên sâu, **SQLite** để lưu trữ và **FastAPI** để xây dựng giao diện quản lý web. Pipeline có tích hợp **lập lịch tự động** và **circuit breaker** để xử lý lỗi.
 
 ---
 
