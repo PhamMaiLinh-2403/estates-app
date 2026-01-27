@@ -138,7 +138,7 @@ def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.
                 data = extract_listing_details(driver, url)
                 
                 if data:
-                    data['scraping_time'] = int(time.time())
+                    # data['scraping_time'] = int(time.time())
                     data_queue.put(data)
                     cb.record_success()
                 else:
