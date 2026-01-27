@@ -11,26 +11,23 @@ BDS_RAW_TABLE = """
     main_info TEXT,
     description TEXT,
     other_info TEXT,
-    image_urls TEXT,
-    scraping_time 
+    image_urls TEXT
     );
     """
 UNIQUE_INDEX_BDS_RAW = """
     CREATE UNIQUE INDEX IF NOT EXISTS index_bds_raw
     ON bds_raw(
     id,
-    url,
     title,
     short_address,
     address_parts,
-    latitude,
-    longitude,
     main_info,
     description,
-    other_info,
-    image_urls
+    other_info
     );
     """
+# Bỏ url, latitude, longitude, image_urls
+
 ONEHOUSING_RAW_TABLE = """
     CREATE TABLE IF NOT EXISTS onehousing_raw(
     property_id TEXT,
@@ -52,21 +49,17 @@ UNIQUE_INDEX_ONEHOUSING_RAW = """
     CREATE UNIQUE INDEX IF NOT EXISTS index_onehousing_raw
     ON onehousing_raw(
     property_id,
-    property_url,
+    property_description,
     listing_title,
     total_price,
     unit_price,
     city,
     district,
     alley_width,
-    features, 
-    latitude,
-    longitude,
-    image_url
+    features
     );
     """
-# Đã bỏ property_description vì nó bị NaN hết trong Onehousing, nếu sửa được sẽ add thêm
-# Bỏ cả property_url vẫn không được
+# Bỏ property_url, latitude, longitude, image_url, thêm property_description
 
 CLEANED_TABLE = """
 CREATE TABLE IF NOT EXISTS cleaned(

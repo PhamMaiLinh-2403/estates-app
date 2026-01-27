@@ -110,7 +110,10 @@ def process_batdongsan_data(raw_path=DETAILS_CSV_PATH['Batdongsan'], final_schem
     if not raw_path.exists():
         print ("Details not found. Please run scraping first.")
 
-    df = pd.read_csv(raw_path)#.drop_duplicates()
+    df = pd.read_csv(raw_path)
+    old_size = df.shape[0]
+    df = df.drop_duplicates(subset=['id','title','short_address','address_parts', 'main_info', 'description', 'other_info'])
+    print(f'Dropped {old_size - df.shape[0]} duplicated raw rows for Batdongsan.')
     standardizer = AddressStandardizer(
         PROVINCES_SQL_FILE, DISTRICTS_SQL_FILE, 
         WARDS_SQL_FILE, STREETS_SQL_FILE

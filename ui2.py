@@ -17,6 +17,8 @@ import pytz
 import sqlite3
 from commons.config import *
 from main import run_pipeline_safe
+import warnings
+warnings.filterwarnings("ignore")
 
 from Batdongsan.orchestrator import (
     process_batdongsan_data 

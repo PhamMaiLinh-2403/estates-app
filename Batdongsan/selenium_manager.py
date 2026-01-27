@@ -72,7 +72,7 @@ def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
                 data = scraper.scrape_listing_details(url)
 
                 if data:
-                    data['scraping_time'] = int(time.time())
+                    # data['scraping_time'] = int(time.time()) # Bỏ cái này đi chứ cần làm gì đâu trời
                     data_queue.put(data)
                     circuit_breaker.record_success()
                 else:

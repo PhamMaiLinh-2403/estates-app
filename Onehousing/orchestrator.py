@@ -167,6 +167,9 @@ def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schem
         return pd.DataFrame()
 
     df_raw = pd.read_csv(raw_path)
+    old_size = df_raw.shape[0]
+    df_raw = df_raw.drop_duplicates(subset=['property_id', 'listing_title', 'total_price', 'unit_price', 'city', 'district', 'alley_width', 'features', 'property_description'])
+    print(f'Dropped {old_size - df_raw.shape[0]} duplicated raw rows for Onehousing.')
     df = OneHousingDataCleaner.clean_onehousing_data(df_raw)
 
     # Rename to standardized schema

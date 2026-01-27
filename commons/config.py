@@ -29,13 +29,13 @@ SELENIUM_CONFIG = {
 # =============================================================================
 # SCRAPER SETTINGS
 # =============================================================================
-MAX_WORKERS = 4
+MAX_WORKERS = 2
 MAX_RETRIES = 3
 RETRY_DELAY = 2          
 SELENIUM_WAIT_TIME = 5   
 
 START_PAGE_NUMBER = 1
-END_PAGE_NUMBER = 3
+END_PAGE_NUMBER = 2
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 
@@ -73,7 +73,7 @@ URLS_CSV_PATH = {
 
 DETAILS_CSV_PATH = {
     "Batdongsan": OUTPUT_DIR / "batdongsan_listing_details.csv",
-    "Onehousing": OUTPUT_DIR / "onehousing_listings_details.csv",
+    "Onehousing": OUTPUT_DIR / "onehousing_listing_details.csv",
 }
 
 CLEANED_CSV_PATH = OUTPUT_DIR / "real_estate_cleaned.csv"
