@@ -163,8 +163,6 @@ Dữ liệu thô rất nhiễu, pipeline áp dụng nhiều bước biến đổ
 * **OneHousing:** Làm sạch bằng `OneHousingDataCleaner`.
 * **Batdongsan:** Làm sạch bằng `DataCleaner` và `AddressStandardizer`.
 
-  * **Logic địa chỉ:** Phân tách địa chỉ. Nếu thiếu “Phường X” nhưng có “Đường Y”, hệ thống sẽ truy vấn DB hành chính để tìm phường chứa đường đó.
-
 ### 3. Database Schema
 
 Dữ liệu được lưu tại `output/real_estate.db`:
@@ -172,42 +170,3 @@ Dữ liệu được lưu tại `output/real_estate.db`:
 * `bds_raw`: HTML/JSON thô từ Batdongsan.
 * `onehousing_raw`: Dữ liệu thô từ Onehousing.
 * `cleaned`: Bảng “Gold” đã chuẩn hóa, dùng cho export.
-
----
-
-## Hướng dẫn triển khai (Host)
-
-Để chạy pipeline liên tục trên Linux server:
-
-1. **Cài Google Chrome:**
-
-```bash
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-sudo apt install ./google-chrome-stable_current_amd64.deb
-```
-
-2. **Tạo service Systemd (Khuyến nghị):**
-
-Tạo file `/etc/systemd/system/realestate_scraper.service`:
-
-```ini
-[Unit]
-Description=Real Estate Scraper API & Scheduler
-After=network.target
-
-[Service]
-User=ubuntu
-WorkingDirectory=/path/to/repo
-ExecStart=/path/to/venv/bin/uvicorn ui:app --host 0.0.0.0 --port 8000
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-3. **Khởi động service:**
-
-```bash
-sudo systemctl enable realestate_scraper
-sudo systemctl start realestate_scraper
-```
