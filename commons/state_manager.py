@@ -24,22 +24,25 @@ class CircuitBreaker:
                 self.consecutive_failures = 0
 
     def record_failure(self, error_type: str):
-        """
-        Record the number of consecutive failed requests and set stop flag if encounter critical errors.
-        """
         with self.lock:
             self.consecutive_failures += 1
             
-            # Critical errors that trigger immediate stop
-            if "ConnectionRefused" in error_type or "MemoryError" in error_type:
+            # Critical errors trigger immediate stop
+            critical_prefixes = ["Critical_", "Fatal_", "MemoryError", "ConnectionRefused"]
+            
+            if any(error_type.startswith(prefix) for prefix in critical_prefixes):
                 self.is_open = True
                 self.stop_reason = f"Critical Error: {error_type}"
+                print(f"[Circuit Breaker] OPEN: {self.stop_reason}")
                 return True
 
             if self.consecutive_failures >= self.threshold:
                 self.is_open = True
-                self.stop_reason = f"Threshold reached: {self.consecutive_failures} consecutive failures"
+                self.stop_reason = f"Threshold reached: {self.consecutive_failures} consecutive failures (last: {error_type})"
+                print(f"[Circuit Breaker] OPEN: {self.stop_reason}")
                 return True
+            else:
+                print(f"[Circuit Breaker] Failure {self.consecutive_failures}/{self.threshold}: {error_type}")
             
         return False
 
