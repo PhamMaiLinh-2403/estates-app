@@ -92,7 +92,6 @@ def run_pipeline_wrapper(resume_mode=False):
         scrape_state["last_run"] = datetime.now().isoformat()
 
     try:
-        # This is where the magic happens based on the boolean
         success, reason = run_pipeline_safe(resume=resume_mode)
         
         if success:
@@ -138,8 +137,7 @@ def schedule_retry_if_needed():
 scheduler.add_job(
     weekly_pipeline_job,
     CronTrigger(day_of_week='mon', hour=17, minute=30),
-    id="weekly_scrape",
-    # replace_existing=True # Muốn thay thế thì phải có cùng ID. Trong trường hợp này, CronTrigger sẽ không thay thế DateTrigger mà sẽ chạy song song với nó
+    id="weekly_scrape"
 )
 
 # Start Scheduler
