@@ -137,7 +137,7 @@ def schedule_retry_if_needed():
 # Add the Weekly Job (New Run)
 scheduler.add_job(
     weekly_pipeline_job,
-    CronTrigger(day_of_week='tue', hour=17, minute=15),
+    CronTrigger(day_of_week='mon', hour=17, minute=30),
     id="weekly_scrape",
     # replace_existing=True # Muốn thay thế thì phải có cùng ID. Trong trường hợp này, CronTrigger sẽ không thay thế DateTrigger mà sẽ chạy song song với nó
 )

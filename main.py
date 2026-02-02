@@ -129,20 +129,40 @@ def run_pipeline_safe(resume=False):
         print('Finished scraping details for Onehousing.')
 
         print('FINISHED SCRAPING ALL DATA. START CLEANING...')
-        # 3. Clean (Only if scraping survived)
+        # 3. Clean 
         clean()
         print('FINISHED CLEANING.')
         
         return True, "Completed"
 
     except PipelineStopException as e:
-        print(f"\n[!!!] Pipeline Stopped: {e}")
-        return False, str(e)
-    except Exception as e:
-        print(f"\n[!!!] Unexpected Error: {e}")
-        traceback.print_exc()
+        print(f"\nPipeline Stopped: {e}")
+        print("Attempting to process and save partial data to DB...")
+
+        try:
+            clean()
+            print("Partial data saved successfully.")
+        except Exception as clean_err:
+            print(f"Warning: Failed to save partial data: {clean_err}")
+
+        state_manager.set_suspended()
         return False, str(e)
 
+    except Exception as e:
+        print(f"\nUnexpected Error: {e}")
+        traceback.print_exc()
+        print("[System] Attempting to process and save partial data to DB...")
+
+        try:
+            clean()
+            print("[System] Partial data saved successfully.")
+        except Exception as clean_err:
+            print(f"[System] Warning: Failed to save partial data: {clean_err}")
+
+        state_manager.set_suspended()
+        return False, str(e)
+    
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Vietnamese Real Estate Pipeline")
     parser.add_argument("--mode", choices=["full", "clean"], default="full")
