@@ -1,14 +1,6 @@
 import time 
 import random
 from seleniumbase import Driver
-from selenium.common.exceptions import (
-    WebDriverException,
-    InvalidSessionIdException,
-    TimeoutException,
-    NoSuchElementException,
-    StaleElementReferenceException,
-    SessionNotCreatedException
-)
 
 from commons.config import *
 from commons.utils import * 
@@ -62,127 +54,45 @@ def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
 
 
 def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
+    """Worker with Circuit Breaker integration."""
     start_delay = worker_id * 2.0
     time.sleep(start_delay)
+
     driver = None
-    scraper = None
-    consecutive_failures = 0
-    
     try:
         driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
         scraper = Scraper(driver)
-        print(f"[Details Worker {worker_id}] Started with {len(url_subset)} URLs")
         
         for idx, url in enumerate(url_subset, 1):
             if circuit_breaker.should_stop():
-                print(f"[Details Worker {worker_id}] Circuit breaker triggered, stopping")
+                print(f"[Worker {worker_id}] Stop signal received.")
                 break
-
-            # Periodic driver refresh to prevent memory leaks and slowdown
-            if idx % DRIVER_REFRESH_INTERVAL == 0:
-                print(f"[Details Worker {worker_id}] Periodic driver refresh at item {idx}")
-                try:
-                    driver.quit()
-                    driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
-                    scraper = Scraper(driver)
-                except Exception as e:
-                    print(f"[Details Worker {worker_id}] Failed to refresh driver: {e}")
-                    circuit_breaker.record_failure(f"DriverRefresh_{type(e).__name__}")
 
             try:
                 data = scraper.scrape_listing_details(url)
-                data_queue.put(data)
-                circuit_breaker.record_success()
-                consecutive_failures = 0
-                
-                if idx % 10 == 0:
-                    print(f"[Details Worker {worker_id}] Progress: {idx}/{len(url_subset)}")
 
-            except (UnicodeDecodeError, UnicodeEncodeError) as e:
-                """
-                ENCODING ERRORS: These are item-specific, not system errors.
-                - Log the error
-                - Skip this item
-                - Continue to next
-                - Don't count toward consecutive failures for driver recreation
-                """
-                print(f"[Details Worker {worker_id}] Encoding error on item {idx} ({url}): {e}")
-                circuit_breaker.record_failure(f"Encoding_{type(e).__name__}")
+                if data:
+                    # data['scraping_time'] = int(time.time()) # Bỏ cái này đi chứ cần làm gì đâu trời
+                    data_queue.put(data)
+                    circuit_breaker.record_success()
+                else:
+                    # Item-level fail (3 internal retries failed)
+                    # We record a failure to the stage-level breaker
+                    circuit_breaker.record_failure("ItemFailed3Times")
+                    print(f"[Worker {worker_id}] Failed item {url}")
 
-            except (InvalidSessionIdException, SessionNotCreatedException, WebDriverException) as e:
-                """
-                WEBDRIVER ERRORS: Driver session issues.
-                - Log the error
-                - Count toward consecutive failures
-                - Recreate driver if too many consecutive failures
-                """
-                print(f"[Details Worker {worker_id}] WebDriver error on item {idx} ({url}): {type(e).__name__}")
-                consecutive_failures += 1
-                circuit_breaker.record_failure(f"WebDriver_{type(e).__name__}")
-                
-                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                    print(f"[Details Worker {worker_id}] {consecutive_failures} consecutive failures, recreating driver...")
-                    try:
-                        if driver:
-                            driver.quit()
-                    except:
-                        pass
-                    
-                    try:
-                        driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
-                        scraper = Scraper(driver)
-                        consecutive_failures = 0
-                        print(f"[Details Worker {worker_id}] Driver recreated successfully")
-                    except Exception as recreate_error:
-                        print(f"[Details Worker {worker_id}] Failed to recreate driver: {recreate_error}")
-                        circuit_breaker.record_failure(f"DriverRecreation_{type(recreate_error).__name__}")
-                        break
-                        
-            except (TimeoutException, StaleElementReferenceException, NoSuchElementException) as e:
-                """
-                SELENIUM ELEMENT ERRORS: Usually transient.
-                - Already retried 3 times by @retry decorator
-                - Log and skip
-                - Don't recreate driver
-                """
-                print(f"[Details Worker {worker_id}] Element error on item {idx} after retries ({url}): {type(e).__name__}")
-                circuit_breaker.record_failure(f"Element_{type(e).__name__}")
-                consecutive_failures += 1
-                
             except (ConnectionRefusedError, MemoryError) as e:
-                """
-                CRITICAL SYSTEM ERRORS: Stop immediately.
-                """
-                print(f"[Details Worker {worker_id}] CRITICAL system error: {e}")
-                circuit_breaker.record_failure(f"Critical_{type(e).__name__}")
+                circuit_breaker.record_failure(str(e))
                 break
-                
             except Exception as e:
-                """
-                UNEXPECTED ERRORS: Log with full details.
-                """
-                print(f"[Details Worker {worker_id}] Unexpected error on item {idx} ({url}): {type(e).__name__}: {e}")
-                circuit_breaker.record_failure(f"Unexpected_{type(e).__name__}")
-                consecutive_failures += 1
+                circuit_breaker.record_failure(str(e))
             
             # Stagger logic
             if SCRAPING_DETAILS_CONFIG["stagger_mode"] == "random":
-                sleep_time = random.uniform(
-                    SCRAPING_DETAILS_CONFIG["stagger_step_sec"], 
-                    SCRAPING_DETAILS_CONFIG["stagger_max_sec"]
-                )
-                time.sleep(sleep_time)
-        
-        print(f"[Details Worker {worker_id}] Completed {idx}/{len(url_subset)} URLs")
+                time.sleep(random.uniform(SCRAPING_DETAILS_CONFIG["stagger_step_sec"], SCRAPING_DETAILS_CONFIG["stagger_max_sec"]))
         
     except Exception as e:
-        print(f"[Details Worker {worker_id}] Fatal initialization error: {type(e).__name__}: {e}")
-        circuit_breaker.record_failure(f"Fatal_{type(e).__name__}")
-        
+        print(f"[Worker {worker_id}] Fatal: {e}")
     finally:
-        if driver:
-            try:
-                driver.quit()
-                print(f"[Details Worker {worker_id}] Driver cleaned up")
-            except Exception as e:
-                print(f"[Details Worker {worker_id}] Error during cleanup: {e}")
+        if driver: 
+            driver.quit()

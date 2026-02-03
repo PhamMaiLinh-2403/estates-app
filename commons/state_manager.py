@@ -105,7 +105,6 @@ class PipelineStateManager:
         done_urls = set()
         if detail_csv.exists():
             try:
-                # Only read relevant columns to save memory
                 df_details = pd.read_csv(detail_csv)
                 # Handle different column names between sites
                 if 'url' in df_details.columns:
