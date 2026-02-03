@@ -35,11 +35,7 @@ RETRY_DELAY = 2
 SELENIUM_WAIT_TIME = 5   
 
 START_PAGE_NUMBER = 1
-<<<<<<< Updated upstream
 END_PAGE_NUMBER = 1
-=======
-END_PAGE_NUMBER = 1 
->>>>>>> Stashed changes
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 

@@ -64,42 +64,67 @@ def weekly_pipeline_job():
     Intent: NEW RUN.
     Action: Cleanup old files, start fresh.
     """
-    print("[Scheduler] Starting Weekly New Run...")
-    run_pipeline_wrapper(resume_mode=False)
+    print("[Scheduler] Starting Weekly Run - Phase 1: URLs Collection...")
+    run_phase_wrapper(resume=False, phase="urls")
+
+def phase_2_job():
+    """
+    DELAYED TRIGGER: 30 mins after Phase 1
+    Intent: START PHASE 2 (Details).
+    Action: Resume (keep URL files), scrape details, clean.
+    """
+    print("[Scheduler] Starting Weekly Run - Phase 2: Details Collection...")
+    # Trigger Phase 2 (Must be resume=True to read the URLs collected in Phase 1)
+    run_phase_wrapper(resume=True, phase="details")
 
 def retry_pipeline_job():
     """
     RETRY TRIGGER: Error or Auto-Recovery
-    Intent: RESUME.
-    Action: Keep CSVs, append data, flush to DB at end.
+    Action: Try to run everything remaining.
     """
-    print("[Scheduler] Starting Retry/Resume Run...")
-    run_pipeline_wrapper(resume_mode=True)
+    print("[Scheduler] Starting Retry/Resume Run (Full Recovery)...")
+    run_phase_wrapper(resume=True, phase="full")
 
-def run_pipeline_wrapper(resume_mode=False):
+def run_phase_wrapper(resume, phase):
     """
-    Core execution logic. 
-    resume_mode=False -> Triggers cleanup_intermediate_files() 
-    resume_mode=True  -> Skips cleanup, appends to CSVs.
+    Generic wrapper to handle locking, execution, and chaining.
     """
     with scrape_lock:
         if scrape_state["running"]:
-            print("[System] Pipeline already running. Skipping job.")
+            print(f"[System] Pipeline busy. Cannot start phase: {phase}.")
             return
         
         scrape_state["running"] = True
-        scrape_state["message"] = "Resuming..." if resume_mode else "Scraping (New Run)..."
+        scrape_state["message"] = f"Running Phase: {phase}..."
         scrape_state["last_run"] = datetime.now().isoformat()
 
     try:
-        success, reason = run_pipeline_safe(resume=resume_mode)
+        # Call the updated function in main.py
+        success, reason = run_pipeline_safe(resume=resume, target_phase=phase)
         
         if success:
-            scrape_state["message"] = "Completed successfully"
-            PipelineStateManager().reset() # Reset retry counter
+            scrape_state["message"] = f"Phase {phase} Completed"
+            
+            if phase == "urls":
+                # Calculate 30 minutes from now
+                run_time = datetime.now() + timedelta(minutes=30)
+                print(f"[System] Phase 1 done. Scheduling Phase 2 for {run_time.strftime('%H:%M:%S')} (30 min rest)")
+                
+                # Schedule the next job
+                scheduler.add_job(
+                    phase_2_job,
+                    trigger=DateTrigger(run_date=run_time),
+                    id=f"phase_2_{int(datetime.now().timestamp())}"
+                )
+            
+            elif phase == "details" or phase == "full":
+                # If we finished details, we are actually done-done.
+                PipelineStateManager().reset()
+                scrape_state["message"] = "Weekly Pipeline Fully Completed"
+
         else:
+            # If failed, trigger the standard retry logic
             scrape_state["message"] = f"Suspended: {reason}"
-            # Only schedule a retry if we haven't hit the limit
             schedule_retry_if_needed()
 
     except Exception as e:
@@ -142,7 +167,6 @@ scheduler.add_job(
 
 # Start Scheduler
 scheduler.start()
-
 
 # 4. API ROUTES 
 

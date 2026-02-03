@@ -97,41 +97,55 @@ def clean():
         traceback.print_exc()
 
 
-def run_pipeline_safe(resume=False):
+def run_pipeline_safe(resume=False, target_phase="full"):
     """
     Runs the pipeline with fault tolerance.
+    target_phase options: "full", "urls", "details"
     """
     state_manager = PipelineStateManager()
     circuit_breaker = CircuitBreaker() 
 
-    if not resume: # Nếu resume == False
-        print("Starting New Pipeline Run...")
-        cleanup_intermediate_files() 
+    if not resume and target_phase in ["full", "urls"]:
+        print("Starting New Pipeline Run (Cleanup initiated)...")
+        cleanup_intermediate_files()    # Only clean up old files on a new run 
         state_manager.reset_for_new_run()
     else:
-        print("Resuming Pipeline...")
+        print(f"Resuming Pipeline (Phase: {target_phase})...")
 
     try:
-        # 1. Batdongsan
-        print("START SCRAPING URLS FOR BATDONGSAN...")
-        scrape_bds_urls(circuit_breaker, state_manager)
-        print('Finished scraping URLs for Batdongsan.')
-        print("START SCRAPING DETAILS FOR BATDONGSAN...")
-        scrape_bds_details(circuit_breaker) 
-        print('Finished scraping details for Batdongsan.')
+        if target_phase in ["full", "urls"]:
+            # 1. Batdongsan
+            print("START SCRAPING URLS FOR BATDONGSAN...")
+            scrape_bds_urls(circuit_breaker, state_manager)
+            print('Finished scraping URLs for Batdongsan.')
 
-        # 2. Onehousing
-        print("START SCRAPING URLS FOR ONEHOUSING...")
-        scrape_oh_urls(circuit_breaker, state_manager)
-        print('Finished scraping URLs for Onehousing.')
-        print("START SCRAPING DETAILS FOR ONEHOUSING...")
-        scrape_oh_details(circuit_breaker)
-        print('Finished scraping details for Onehousing.')
+            # 2. Onehousing
+            print("START SCRAPING URLS FOR ONEHOUSING...")
+            scrape_oh_urls(circuit_breaker, state_manager)
+            print('Finished scraping URLs for Onehousing.')
+            
+            if target_phase == "urls":
+                print("URLs Collection Completed.")
+                state_manager.set_completed()
+                return True, "URLs Collected"
 
-        print('FINISHED SCRAPING ALL DATA. START CLEANING...')
-        # 3. Clean 
-        clean()
-        print('FINISHED CLEANING.')
+        if target_phase in ["full", "details"]:
+            # 1. Batdongsan
+            print("START SCRAPING DETAILS FOR BATDONGSAN...")
+            scrape_bds_details(circuit_breaker) 
+            print('Finished scraping details for Batdongsan.')
+
+            # 2. Onehousing
+            print("START SCRAPING DETAILS FOR ONEHOUSING...")
+            scrape_oh_details(circuit_breaker)
+            print('Finished scraping details for Onehousing.')
+
+            print('FINISHED SCRAPING ALL DATA. START CLEANING...')
+            # 3. Clean 
+            clean()
+            print('FINISHED CLEANING.')
+
+            state_manager.set_completed()
         
         return True, "Completed"
 
