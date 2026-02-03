@@ -2,6 +2,8 @@ import threading
 import queue
 import pandas as pd 
 import numpy as np 
+import time 
+import gc 
 
 from commons.config import * 
 from commons.utils import * 
@@ -40,7 +42,8 @@ def scrape_urls_multithreaded(circuit_breaker: CircuitBreaker, state_manager: Pi
     
     threads = []
     for worker_id, pages in enumerate(page_chunks):
-        if not pages: continue
+        if not pages: 
+            continue
         thread = threading.Thread(
             target=scrape_urls_worker,
             args=(worker_id, SEARCH_PAGE_URL['Batdongsan'], pages, url_queue, circuit_breaker, state_manager)
@@ -82,20 +85,40 @@ def scrape_details_multithreaded(circuit_breaker: CircuitBreaker):
     )
     writer_thread.start()
 
-    url_chunks = list(chunks(urls_to_scrape, MAX_WORKERS))
+    super_batches = list(chunks(urls_to_scrape, DRIVER_RESTART_INTERVAL))
     
-    threads = []
-    for worker_id, url_subset in enumerate(url_chunks):
-        if not url_subset: continue
-        thread = threading.Thread(
-            target=scrape_details_worker,
-            args=(worker_id, url_subset, data_queue, circuit_breaker)
-        )
-        threads.append(thread)
-        thread.start()
+    for batch_idx, batch_urls in enumerate(super_batches):
+        if circuit_breaker.should_stop():
+            break
 
-    for thread in threads:
-        thread.join()
+        print(f"\n[Batdongsan] Processing Batch {batch_idx + 1}/{len(super_batches)} "
+              f"({len(batch_urls)} items)")
+
+        # Split this specific batch among workers
+        url_chunks = list(chunks(batch_urls, MAX_WORKERS))
+        
+        threads = []
+        for worker_id, url_subset in enumerate(url_chunks):
+            if not url_subset: 
+                continue
+            thread = threading.Thread(
+                target=scrape_details_worker,
+                args=(worker_id, url_subset, data_queue, circuit_breaker)
+            )
+            threads.append(thread)
+            thread.start()
+
+        # Wait for all threads in this batch to finish (Drivers quit here)
+        for thread in threads:
+            thread.join()
+        
+        gc.collect()
+        print(f"[Batdongsan] Batch {batch_idx + 1} completed. Drivers refreshed.")
+
+        # Cooldown between superbatches 
+        if batch_idx < len(super_batches) - 1 and not circuit_breaker.should_stop():
+            print(f"[Batdongsan] Cooling down for {BATCH_COOLDOWN_SECONDS} seconds...")
+            time.sleep(BATCH_COOLDOWN_SECONDS)
 
     data_queue.put(None)
     writer_thread.join()
