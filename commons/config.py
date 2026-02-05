@@ -4,7 +4,7 @@ from pathlib import Path
 # BROWSER CONFIGURATION
 # =============================================================================
 SELENIUM_CONFIG = {
-    "headless": True,
+    "headless": False,
     "uc_driver": True,
     "window_size": "1920,1080",
     "args": [
@@ -29,13 +29,15 @@ SELENIUM_CONFIG = {
 # =============================================================================
 # SCRAPER SETTINGS
 # =============================================================================
-MAX_WORKERS = 10
+MAX_WORKERS = 12 
 MAX_RETRIES = 3
 RETRY_DELAY = 2          
 SELENIUM_WAIT_TIME = 5   
+DRIVER_RESTART_INTERVAL = 5000
+BATCH_COOLDOWN_SECONDS = 600 
 
 START_PAGE_NUMBER = 1
-END_PAGE_NUMBER = 1
+END_PAGE_NUMBER = 2500 
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 

@@ -72,12 +72,9 @@ def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
                 data = scraper.scrape_listing_details(url)
 
                 if data:
-                    # data['scraping_time'] = int(time.time()) # Bỏ cái này đi chứ cần làm gì đâu trời
                     data_queue.put(data)
                     circuit_breaker.record_success()
                 else:
-                    # Item-level fail (3 internal retries failed)
-                    # We record a failure to the stage-level breaker
                     circuit_breaker.record_failure("ItemFailed3Times")
                     print(f"[Worker {worker_id}] Failed item {url}")
 

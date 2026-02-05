@@ -2,6 +2,7 @@ import threading
 import queue
 import time
 import random
+import gc 
 import pandas as pd
 from typing import List
 
@@ -106,19 +107,39 @@ def scrape_onehousing_details(circuit_breaker: CircuitBreaker):
     )
     writer_thread.start()
 
-    url_chunks = list(chunks(urls_to_scrape, MAX_WORKERS))
-    threads = []
-    
-    for i, chunk in enumerate(url_chunks):
-        t = threading.Thread(
-            target=onehousing_detail_worker, 
-            args=(i, chunk, data_queue, circuit_breaker)
-        )
-        threads.append(t)
-        t.start()
+    batch_size = DRIVER_RESTART_INTERVAL
+    super_batches = [
+        urls_to_scrape[i : i + batch_size] 
+        for i in range(0, len(urls_to_scrape), batch_size)
+    ]
 
-    for t in threads:
-        t.join()
+    for batch_idx, batch_urls in enumerate(super_batches):
+        if circuit_breaker.should_stop():
+            break
+            
+        print(f"\n[Onehousing] Processing Batch {batch_idx + 1}/{len(super_batches)} "
+              f"({len(batch_urls)} items)")
+
+        url_chunks = list(chunks(batch_urls, MAX_WORKERS))
+        threads = []
+        
+        for i, chunk in enumerate(url_chunks):
+            t = threading.Thread(
+                target=onehousing_detail_worker, 
+                args=(i, chunk, data_queue, circuit_breaker)
+            )
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+            
+        gc.collect()
+        print(f"[Onehousing] Batch {batch_idx + 1} completed. Drivers refreshed.")
+
+        if batch_idx < len(super_batches) - 1 and not circuit_breaker.should_stop():
+            print(f"[Onehousing] Cooling down for {BATCH_COOLDOWN_SECONDS} seconds...")
+            time.sleep(BATCH_COOLDOWN_SECONDS)
     
     data_queue.put(None)
     writer_thread.join()

@@ -45,11 +45,6 @@ class DatabaseManager:
 
     def add_row_to_table(data_path, table_name):
         df = pd.read_csv(data_path)
-        # df.replace(np.nan, '', inplace=True)
-        try:
-            df.drop(columns='scraping_time', inplace=True)
-        except:
-            pass
         cols = list(df.columns)
         placeholders = ",".join(["?"] * (len(cols)))
         quoted_cols = ",".join(f'"{col}"' for col in cols)
