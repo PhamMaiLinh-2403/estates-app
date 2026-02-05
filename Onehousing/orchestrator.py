@@ -1,5 +1,6 @@
 import threading
 import queue
+import os 
 import time
 import random
 import gc 
@@ -149,8 +150,11 @@ def scrape_onehousing_details(circuit_breaker: CircuitBreaker):
 
 def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.Queue, cb: CircuitBreaker):
     driver = None
+    user_data_dir = None
+
     try:
-        driver = create_driver(headless=True)
+        # Unpack tuple
+        driver, user_data_dir = create_driver(headless=True)
         for idx, url in enumerate(urls):
             if cb.should_stop(): 
                 break
@@ -180,6 +184,12 @@ def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.
             try: 
                 driver.quit()
             except: 
+                pass
+        # Clean up temp dir
+        if user_data_dir and os.path.exists(user_data_dir):
+            try:
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+            except:
                 pass
 
 def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schema=FINAL_SCHEMA):

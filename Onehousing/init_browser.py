@@ -1,4 +1,6 @@
 import random
+import tempfile
+import shutil
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from fake_useragent import UserAgent
@@ -17,15 +19,18 @@ def get_random_user_agent():
 
 def create_driver(headless=True):
     """
-    Initialize and return a new Selenium WebDriver instance.
-    Each thread should call this to get its own independent driver.
+    Returns tuple: (driver, user_data_dir)
     """
     user_agent = get_random_user_agent()
     options = Options()
     options.add_argument(f"user-agent={user_agent}")
     
+    # Create unique profile dir
+    user_data_dir = tempfile.mkdtemp()
+    options.add_argument(f"--user-data-dir={user_data_dir}")
+    
     if headless:
-        options.add_argument("--headless")
+        options.add_argument("--headless=new") # Use new headless mode for better stability
     
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
@@ -37,7 +42,8 @@ def create_driver(headless=True):
 
     try:
         driver = webdriver.Chrome(options=options)
-        return driver
+        return driver, user_data_dir
     except Exception as e:
+        shutil.rmtree(user_data_dir, ignore_errors=True)
         print(f"[Driver Init] Failed to initialize WebDriver: {e}")
         raise
