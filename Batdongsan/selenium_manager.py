@@ -1,33 +1,64 @@
 import time 
 import random
+import shutil
+import tempfile
+import threading
+import os 
+from pathlib import Path
 from seleniumbase import Driver
 
 from commons.config import *
 from commons.utils import * 
 from .scraping import Scraper
 
+# Global lock to prevent 12 browsers from spawning at the exact same millisecond
+# which causes CPU spikes and port binding race conditions.
+DRIVER_INIT_LOCK = threading.Lock()
 
-def create_stealth_driver(headless: bool = True) -> Driver:
-    """Creates a stealth Selenium driver instance using seleniumbase's UC mode."""
-    driver = Driver(
-        uc=SELENIUM_CONFIG["uc_driver"],
-        headless=headless,
-        agent=None,
-    )
+def create_stealth_driver(headless: bool = True):
+    """
+    Creates a stealth Selenium driver instance using seleniumbase's UC mode.
+    Returns tuple: (driver, user_data_dir_path)
+    """
+    # Create a unique temporary directory for this specific thread/driver
+    user_data_dir = tempfile.mkdtemp()
 
-    width, height = map(int, SELENIUM_CONFIG["window_size"].split(','))
-    driver.set_window_size(width, height)
-
-    return driver
+    with DRIVER_INIT_LOCK:
+        try:
+            driver = Driver(
+                uc=SELENIUM_CONFIG["uc_driver"],
+                headless=headless,
+                agent=None,
+                user_data_dir=user_data_dir, # CRITICAL: Isolate the profile
+                incognito=False, # UC mode works best without explicit incognito flag if user_data_dir is custom
+            )
+            
+            # Set window size
+            width, height = map(int, SELENIUM_CONFIG["window_size"].split(','))
+            driver.set_window_size(width, height)
+            
+            # Random tiny sleep to offset port allocation
+            time.sleep(random.uniform(0.5, 1.5))
+            
+            return driver, user_data_dir
+        except Exception as e:
+            # If init fails, clean up the temp dir immediately
+            shutil.rmtree(user_data_dir, ignore_errors=True)
+            raise e
 
 
 def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
     """Wrapper to handle specific pages list instead of range."""
-    time.sleep(worker_id * 1.0)
-    driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
-    scraper = Scraper(driver)
+    # Stagger start times significantly to prevent resource choking
+    time.sleep(worker_id * 2.0)
+    
+    driver = None
+    user_data_dir = None
     
     try:
+        driver, user_data_dir = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
+        scraper = Scraper(driver)
+        
         for page in pages:
             if cb.should_stop(): 
                 break
@@ -43,24 +74,35 @@ def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
                     print(f"[Worker {worker_id}] Page {page}: Found {len(new_urls)}")
                 else:
                     print(f"[Worker {worker_id}] Page {page}: No URLs found")
-                    # Empty page is not a failure, just empty.
             except (ConnectionRefusedError, MemoryError) as e:
                 cb.record_failure(str(e))
                 break
             except Exception as e:
                 cb.record_failure(str(e))
     finally:
-        driver.quit()
+        if driver:
+            try:
+                driver.quit()
+            except:
+                pass
+        # Clean up the unique profile folder
+        if user_data_dir and os.path.exists(user_data_dir):
+            try:
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+            except:
+                pass
 
 
 def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
     """Worker with Circuit Breaker integration."""
-    start_delay = worker_id * 2.0
+    start_delay = worker_id * 3.0 # Increase stagger time
     time.sleep(start_delay)
 
     driver = None
+    user_data_dir = None
+
     try:
-        driver = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
+        driver, user_data_dir = create_stealth_driver(headless=SELENIUM_CONFIG["headless"])
         scraper = Scraper(driver)
         
         for idx, url in enumerate(url_subset, 1):
@@ -92,4 +134,12 @@ def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
         print(f"[Worker {worker_id}] Fatal: {e}")
     finally:
         if driver: 
-            driver.quit()
+            try:
+                driver.quit()
+            except:
+                pass
+        if user_data_dir and os.path.exists(user_data_dir):
+            try:
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+            except:
+                pass

@@ -29,7 +29,7 @@ SELENIUM_CONFIG = {
 # =============================================================================
 # SCRAPER SETTINGS
 # =============================================================================
-MAX_WORKERS = 12 
+MAX_WORKERS = 8 
 MAX_RETRIES = 3
 RETRY_DELAY = 2          
 SELENIUM_WAIT_TIME = 5   
