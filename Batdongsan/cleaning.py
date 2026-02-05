@@ -39,6 +39,7 @@ class DataCleaner:
         
     @staticmethod
     def _is_negated(text, keyword):
+        """Check if a phrase holds negative meaning."""
         negation_keywords = ['không', 'chưa', 'ko', 'chẳng', 'khó']
         window = 4  
 
@@ -46,6 +47,7 @@ class DataCleaner:
             pattern = rf'\b{neg}(?:\s+\w+){{0,{window}}}?\s+{re.escape(keyword)}\b'
             if re.search(pattern, text):
                 return True
+            
         return False
     
     @staticmethod
@@ -111,7 +113,7 @@ class DataCleaner:
     @staticmethod
     def extract_ward(row):
         """Extracts the ward (Phường/Xã/Thị trấn) from the address."""
-        short_address = row.get("short_address")
+        short_address = str(row.get("short_address", "")).strip()
         if pd.notna(short_address) and isinstance(short_address, str):
             parts = [p.strip() for p in short_address.split(",")]
             for part in parts:
@@ -165,7 +167,7 @@ class DataCleaner:
     @staticmethod
     def extract_address_details(row):
         """
-        Extract detailed address information (house number, alley, etc.).
+        Extract detailed address information.
         """
         short_address = str(row.get("short_address", "")).strip()
         parts = [p.strip() for p in short_address.split(",") if pd.notna(p) and isinstance(p, str)]
@@ -176,7 +178,7 @@ class DataCleaner:
         for part in parts:
             lower_part = part.lower().strip()
 
-            # Skip if it starts with an ignore prefix followed by "số"
+            # Skip if it starts with an ignore prefix followed by "số": đường số 7, đại lộ số 5,... 
             if any(lower_part.startswith(f"{prefix} số") for prefix in ignore_prefixes):
                 continue
 
@@ -579,6 +581,7 @@ class DataCleaner:
                     continue  
 
         if construction_area is not None and num_floors is not None:
+            # If building area is not found in textual evidence, fallback to formula: Bulding area = Construction area x Number of floors 
             return round(construction_area * num_floors, 2)
 
         return None
@@ -595,7 +598,7 @@ class DataCleaner:
         if val:
             try:
                 num_val = float(str(val).replace(",", ".").strip().split()[0])
-                if num_val <= 15:
+                if num_val <= 15: # No way a road in VN is wider than 15m :)))) not even a highway road 
                     return num_val
             except ValueError:
                 pass  
@@ -603,7 +606,8 @@ class DataCleaner:
         pattern = '|'.join(ALLEY_WIDTH.keys())
         matched_patterns = re.findall(rf'{pattern}', text)
         for pat in matched_patterns:
-            if re.search(rf'(?:cách|ra|\d+k?m|tới|gần)\s(?:\w+\s){{0,2}}{pat}', text, re.IGNORECASE):
+            # Exclude all the phrases denoting distance to the primary roads 
+            if re.search(rf'(?:cách|ra|\d+k?m|tới|gần)\s(?:\w+\s){{0,2}}{pat}', text, re.IGNORECASE): 
                 continue
             else:
                 return ALLEY_WIDTH[pat]
@@ -657,16 +661,19 @@ class DataCleaner:
             match_4 = re.search(rf'cách\s+(?:\S+\s+)*?(?:{major_roads})\s+(?:\S+\s*){{0,4}}?(\d{{1,3}}(?:[.,]\d+)?\s*(?:m|km))', text, re.IGNORECASE) # cách mặt tiền Trần Nhân Tông 20m
             match_5 = re.search(rf'(?:(?:{major_roads}|{tertiary})\s+\S+\s*){{1,5}}cách\s+(?:\S+\s*){{0,5}}(\d+(?:[.,]\d+)?\s*(?:m|km))', text, re.IGNORECASE) # đường Trường Chinh cách nhà 25m 
             match_6 = re.search(rf'\D(\d{{1,3}}(?:[.,]\d+)?\s*(?:m|km))\s*ra\s*(?:\S+\s*){{0,2}}(?:{tertiary})\s*(?:\S+\s+){{0,5}}', text, re.IGNORECASE) # 50m ra Quốc Lộ 1A
-            pattern_7 = re.findall(r'(\d{1,3}(?:[.,]\d+)?\s*(?:m|km))\s*ra\s*([\w\s]+)', text, re.IGNORECASE)
-
+            pattern_7 = re.findall(r'(\d{1,3}(?:[.,]\d+)?\s*(?:m|km))\s*ra\s*([\w\s]+)', text, re.IGNORECASE) # Tìm mọi loại khoảng cách xuất hiện trong bài đăng có dạng xx m ra abc 
             match_7 = None
+
             for distance, place in pattern_7:
                 if not re.search(rf'\b({landmarks}|{places_of_interest})\b', place, re.IGNORECASE):
+                    # re.findall trả lại list gồm tuples nên chúng ta sẽ tạo Dummy Match để xử lý list đó 
+                    # Loại bỏ những trường hợp là khoảng cách đến bệnh viện, trường học,... 
                     class DummyMatch:
                         def __init__(self, distance, place):
                             self._distance = distance
                             self._place = place
                         def group(self, idx):
+                            # Trả lại object có dạng tương tự như Match object của re.search 
                             if idx == 0:
                                 return f"{self._distance} ra {self._place}"
                             elif idx == 1:
@@ -678,6 +685,7 @@ class DataCleaner:
            
             for pattern in all_patterns:
                 if pattern:
+                    # Convert the distance to metres unit 
                     if re.search(landmarks, pattern.group(0)) or re.search(places_of_interest, pattern.group(0)):
                         continue 
                     if 'km' in pattern.group(1):
@@ -711,23 +719,32 @@ class DataCleaner:
     
     @staticmethod
     def search_pho(string, short_add):
+        """Determine if a property is on the main road or in the alley."""
         string_lower = string.lower()
         main_road = '(?:\S+\s){0,5}(?:nhà(?:\s\S+){0,2} mặt phố|mặt phố|mặt tiền phố|mt phố|phân lô phố|nhà(?:\s\S+){0,2} mặt đường|nhà(?:\s\S+){0,2} đường|mặt đường| mt đường|mặt tiền đường|\Wmtd\W|\Wmtđ\W)\s?(?:\S+\s){0,4}'
         short_main_road = '(?:nhà(?:\s\S+){0,2} mặt phố|mặt phố|mặt tiền phố|mt phố|phân lô phố|nhà(?:\s\S+){0,2} mặt đường|nhà(?:\s\S+){0,2} đường|mặt đường| mt đường|mặt tiền đường|\Wmtd\W|\Wmtđ\W)'
+        
         if len(re.findall(short_main_road, string_lower)) >= 5:
             return 'Drop'
+        
         close = 'gần|cạnh|\Wra\W|sát|giáp|cách|sau|tránh|đối diện|kết nối|tương lai|quy hoạch|ký gửi|ký gởi|kí gửi|kí gởi|chuyên|nhà ngõ|nhà ngách|nhà hẻm|nhà kiệt|biệt thự|liên hệ|\Wlh\W|bước|căn|(?:vài|\d+)\snhà|phút|\d+p'
+        
         if short_add != '':
             short_add_split = short_add.lower().strip().split(',')
+            
             if 'đường' in short_add_split[0] or 'phố' in short_add_split[0]:
                 road_name_in_short_add = short_add_split[0].replace('đường', '').replace('phố', '').strip()
+                
                 if re.search(rf'(?:{close})\s?(?:\S+\s){{0,5}}{re.escape(road_name_in_short_add)}', string_lower):
                     return None
+                
                 if re.search(rf'{re.escape(road_name_in_short_add)}(?![^\.,\?!]*[.,\?!])\s?(?:\S+\s){{0,2}}(?:{close})', string_lower):
                     return None
+        
         pho = re.search(main_road, string_lower)
+        
         if pho:
-            # Nếu các cụm đó chỉ là gần phố, gần đường abc --> thì bỏ
+            # Nếu các cụm đó chỉ là gần phố, gần đường abc --> bỏ qua 
             if re.search(close, pho.group(0)):
                 return None
             # return 'Mặt phố'
@@ -740,13 +757,16 @@ class DataCleaner:
                 # Tìm 20 ký tự sau các keyword về mặt phố mặt ngõ
                 end = len(string) if road_span[1] + 20 > len(string) else road_span[1] + 20
                 road_name_list = string[road_span[1]:end].split()
+                
                 if len(road_name_list) < 1:
                     road_name = None
+                
                 elif len(road_name_list) == 1:
                     if road_name_list[0][0].isupper() or re.match(r'\d+/\d+', road_name_list[0]):
                         road_name = road_name_list[0]
                     else:
                         road_name = None
+                
                 else:
                     # Nếu hai từ đầu tiên sau đó được viết hoa thì khả năng cao nó chính là tên đường
                     if road_name_list[0][0].isupper() and road_name_list[1][0].isupper():
@@ -756,6 +776,7 @@ class DataCleaner:
                         road_name = road_name_list[0]
                     else:
                         road_name = None
+                
                 if road_name:
                     # Tìm sự xuất hiện của tên đường trong phần còn lại của description
                     search_string = f'(?:\S+\s){{0,5}}{re.escape(road_name)}\W?\s?(?:\S+\s){{0,4}}'
@@ -776,40 +797,32 @@ class DataCleaner:
                             if re.search('(?:gần|cạnh|cách|\Wra|giáp|sát) (?:phố|mặt phố)', string_lower) or re.search(r'(?:phố|mặt phố)\s(?:\S+\s)?(?:gần|cạnh|cách|ra\W|giáp|sát|vào)', string_lower):
                                 return None
                             return 'Mặt phố'                
+                
                 else:
                     if re.search('(?:gần|cạnh|cách|\Wra|giáp|sát) (?:phố|mặt phố)', string_lower) or re.search(r'(?:phố|mặt phố)\s(?:\S+\s)?(?:gần|cạnh|cách|ra\W|giáp|sát|vào)', string_lower):
                         return None
                     return 'Mặt phố'
+                
         return None
 
     @staticmethod
     def extract_street_or_alley_front(row):
-        #------TH0: check từ short_address------
         road_add = row['short_address'].split(',')[0].lower()
+
         if '/' in road_add:
             # Đường 2/9 (đại khái không phải xoẹt)
             if re.search(r'(?:đường|phố) (?:\S+\s){0,2}(?:\S+/\S+)', road_add):
                 pass 
             else:
                 return 'Mặt ngõ'
+            
         if re.search(r'hẻm|ngõ|ngách|kiệt\s', road_add):
             return 'Mặt ngõ'
         
-        if pd.notna(row['description']):
-            des = row['description']
-        else:
-            des = ''
-        if pd.notna(row['title']):
-            title = row['title']
-        else:
-            title = ''
-
-        string = title + '. ' + des
-        short_add = row['short_address']
-        if short_add is None:
-            short_add = ''
+        string = f"{row.get('title', '')} {row.get('description', '')}".lower().strip()
+        short_add = str(row.get("short_address", "")).strip()
         pho = DataCleaner.search_pho(string, short_add)
-        string = string.lower()
+
         #------ TH1: Hẻm xe hơi, hẻm xe tải và sẹc ------
         if re.search(r'hxh|hxt|sẹc|sẹt|xẹc|xẹt| sec ', string):
             return 'Mặt ngõ'
@@ -846,6 +859,7 @@ class DataCleaner:
         #------ TH6: Ngõ ------
         ngo = re.findall(r'(?:(?<!hơn\s)(?<!như\s)(?<!giá\s)(?:\S+\s*){1,3})ngõ', string)
         cua_ngo = re.search(r'(?<!đỗ\s)(?:cửa ngõ|cưa ngõ|một mặt ngõ|1 mặt ngõ|một ngõ|1 ngõ)', string)
+
         if ngo:
             if "nhà ngõ" in string:
                 return 'Mặt ngõ'
@@ -865,11 +879,13 @@ class DataCleaner:
                 if pho:
                     return 'Drop' # Drop hết các dòng trong phần này vì nó lẫn lộn giữa mặt phố và mặt ngõ
                 return 'Mặt ngõ'
+            
         if pho:
             slash = re.search(r'nhà \d+/\D', string)
             if slash and slash.group(0) != '24/24' and slash.group(0) != '24/7':
                 return 'Mặt ngõ'
             return 'Mặt phố' # return 'Có mặt phố'
+        
         return None 
 
 
@@ -915,13 +931,13 @@ class DataImputer:
             if gt_province_subset.empty:
                 continue
 
-            # 3. Look up the estate with closest area
+            # 2. Look up the estate with closest area
             gt_province_subset['area_diff'] = (gt_province_subset['Diện tích (m2)'] - target_area).abs()
             best_match = gt_province_subset.loc[gt_province_subset['area_diff'].idxmin()]
             gt_width = best_match['Kích thước mặt tiền (m)']
             gt_length = best_match['Kích thước chiều dài']
 
-            # 4. Calculate the width from the ground truth estate's shape ratio 
+            # 3. Calculate the width from the ground truth estate's shape ratio 
             shape_ratio = gt_width / gt_length
             imputed_width = (target_area * shape_ratio) ** 0.5
             df_imputed.loc[index, target_col] = round(imputed_width, 2)

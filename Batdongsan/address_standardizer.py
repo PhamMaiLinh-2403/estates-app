@@ -35,6 +35,7 @@ class AddressStandardizer:
                 conn.executescript(ward_cleaned)
 
             with open(self.streets_sql_path, "r", encoding="utf-8") as f:
+                # The two lines below are intentional and not duplicated. Do not touch this! You have been warned. 
                 street_cleaned = f.read().replace("'\\'", "''")
                 street_cleaned = f.read().replace("'\'", "''")
                 conn.executescript(street_cleaned)
@@ -71,20 +72,25 @@ class AddressStandardizer:
         self.reverse_province_map['Bà Rịa Vũng Tàu'] = 'Tỉnh Bà Rịa - Vũng Tàu'
 
         self.reverse_district = {}
+
         for province in districts_df['province_name'].unique():
             self.reverse_district[province] = {}
             for district_name in districts_df[districts_df['province_name'] == province]['district_name'].unique():
                 district_name_strip = district_name.replace('Thành phố ', '').replace('Thành Phố ', '').replace('Quận ', '').replace('Huyện ', '').replace('Thị xã ', '').replace('Thị Xã ', '').strip()
                 self.reverse_district[province][district_name_strip] = district_name
+
         self.reverse_district['Tỉnh Bà Rịa - Vũng Tàu']['Long Đất'] = 'Huyện Long Đất'
         self.reverse_district['Thành phố Hồ Chí Minh']['Quận 2'] = 'Thành phố Thủ Đức'
         self.reverse_district['Thành phố Hồ Chí Minh']['Quận 9'] = 'Thành phố Thủ Đức'
 
         self.reverse_ward = {}
+
         for province in self.reverse_district.keys():
             self.reverse_ward[province] = {}
+
             for district in self.reverse_district[province].values():
                 self.reverse_ward[province][district] = {}
+
                 for ward in wards_df[wards_df['district_name'] == district]['ward_name'].unique():
                     ward_name_strip = normalize('NFC', ward.replace('Xã ', '').replace('Phường ', '').replace('Thị trấn ', '').replace('Thị Trấn ', '').strip())
                     self.reverse_ward[province][district][ward_name_strip] = ward
@@ -95,10 +101,12 @@ class AddressStandardizer:
     def standardize_province(self, province_name: Optional[str]) -> Optional[str]:
         if not isinstance(province_name, str):
             return province_name
+        
         province_name = province_name.replace('.', '')
         province_name = province_name.replace(',', '')
         province_name = province_name.replace('?', '')
         province_name = province_name.replace('!', '')
+
         return self.reverse_province_map.get(province_name, province_name)
 
     def standardize_district(self, row) -> Optional[str]:
@@ -108,17 +116,22 @@ class AddressStandardizer:
             if isinstance(district_value, str):
                 if district_value == 'Quận 2' or district_value == 'Quận 9':
                     return 'Thành phố Thủ Đức'
+                
                 for pre in prefix:
                     if district_value.startswith(pre):
                         return district_value
+                    
                 province = row['Tỉnh/Thành phố']
+
                 if district_value in self.reverse_district[province].keys():
                     return self.reverse_district[province][district_value]
+                
                 for dis in self.reverse_district[province].keys():
                     similarity = fuzz.ratio(district_value, dis)
                     if similarity >= 66:
                         return self.reverse_district[province][dis]
                 return None
+            
             return None
 
     def standardize_ward(self, row):
@@ -128,38 +141,50 @@ class AddressStandardizer:
             # Function to match values with its corresponding prefixes
             if ward_value in self.reverse_ward[province_value][district_value].keys():
                 return self.reverse_ward[province_value][district_value][ward_value]
+            
             for ward in self.reverse_ward[province_value][district_value].keys():
                 similarity = fuzz.ratio(ward_value, ward)
                 if similarity >= 66:
                     return self.reverse_ward[province_value][district_value][ward]
+                
             return None
                 
         if ward_value:
             prefix = ['Xã', 'Phường', 'Thị trấn', 'Thị Trấn']
+
             for pre in prefix:
                 if ward_value.startswith(pre):
                     return ward_value
+                
             ward_value = normalize('NFC', ward_value)
             district_value = row['Thành phố/Quận/Huyện/Thị xã']
             province_value = row['Tỉnh/Thành phố']
+
             return matching(ward_value, district_value, province_value)
+        
         else:
             short_add = row['short_address']
+            
             if isinstance(short_add, str) and short_add != '':
+
                 if 'xã' in short_add.lower():
                     match_result = re.search(pattern='(xã [\w\s]+)', string=short_add.lower())
+
                     if match_result:
                         match_result = match_result[0]
                         result_split = match_result.split()
                         result = ' '.join(i.capitalize() for i in result_split)
                         return result
+                    
                 elif 'phường' in short_add.lower():
                     match_result = re.search(pattern='(phường [\w\s]+)', string=short_add.lower())
+
                     if match_result:
                         match_result = match_result[0]
                         result_split = match_result.split()
                         result = ' '.join(i.capitalize() for i in result_split)
                         return result
+                    
                 elif 'thị trấn' in short_add.lower():
                     match_result = re.search(pattern='(thị trấn [\w\s]+)', string=short_add.lower())
                     if match_result:
@@ -167,6 +192,7 @@ class AddressStandardizer:
                         result_split = match_result.split()
                         result = ' '.join(i.capitalize() for i in result_split)
                         return result
+                    
                 else:
                     short_add_list = row['short_address'].split(',')
                     if len(short_add_list) >= 3:
