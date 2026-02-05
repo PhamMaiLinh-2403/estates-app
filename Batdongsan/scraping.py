@@ -20,7 +20,8 @@ class Scraper:
         """Initializes the scraper with a Selenium WebDriver instance."""
         self.driver = driver
 
-    def scrape_single_page(self, page_url: str) -> list[str]:
+    def scrape_single_page(self, page_url: str):
+        """Function to extract all listing URLs from a menu page."""
         page_urls = []
         print(f"Scraping page: {page_url}")
 
@@ -51,26 +52,6 @@ class Scraper:
             print(f"Error scraping page {page_url}: {e}")
         
         return page_urls
-
-    def scrape_listing_urls(self, search_page_url: str, start_page_number: int, end_page_number: int) -> list[str]:
-        """
-        Iterates through pagination and collects all product URLs.
-        """
-        all_urls = []
-        
-        for i in range(start_page_number, end_page_number + 1):
-            current_url = build_page_url(search_page_url, i)
-            
-            new_urls = self.scrape_single_page(current_url)
-            
-            if not new_urls:
-                print(f"No URLs found on page {i}. Stopping early.")
-                break
-                
-            all_urls.extend(new_urls)
-            print(f"Found {len(new_urls)} URLs on page {i}. Total: {len(all_urls)}")
-
-        return all_urls
     
     @retry(max_tries=3, delay_seconds=5)
     def scrape_listing_details(self, url: str) -> dict | None:
@@ -88,6 +69,7 @@ class Scraper:
             coordinates = self._scrape_lat_long()
             listing_id = listing_info.get_attribute("prid")
 
+            # Dictionary of data 
             listing_data = {
                 "url": url,
                 "title": self._get_text(self.driver, "h1.re__pr-title"),
@@ -128,6 +110,7 @@ class Scraper:
 
             for script in script_tags:
                 script_content = script.get_attribute('innerHTML')
+
                 if script_content and target_text in script_content:
                     lat_match = re.search(r"latitude:\s*([\d\.]+)", script_content)
                     lon_match = re.search(r"longitude:\s*([\d\.]+)", script_content)
@@ -152,6 +135,7 @@ class Scraper:
             value = self._get_text(item, ".value")
             ext = self._get_text(item, ".ext")
             items_data.append({"title": title, "value": value, "ext": ext})
+            
         return items_data
 
     def _scrape_other_info(self, body):

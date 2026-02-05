@@ -64,7 +64,7 @@ def scrape_urls_multithreaded(circuit_breaker: CircuitBreaker, state_manager: Pi
 
 
 def scrape_details_multithreaded(circuit_breaker: CircuitBreaker):
-    """Phase 2: Scrape details from collected URLs (Resumable)."""
+    """Phase 2: Scrape details from collected URLs."""
     state_manager = PipelineStateManager()
     
     # Get only URLs that haven't been scraped yet

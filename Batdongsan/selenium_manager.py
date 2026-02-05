@@ -4,21 +4,19 @@ import shutil
 import tempfile
 import threading
 import os 
-from pathlib import Path
 from seleniumbase import Driver
 
 from commons.config import *
 from commons.utils import * 
 from .scraping import Scraper
 
-# Global lock to prevent 12 browsers from spawning at the exact same millisecond
+# Global lock to prevent browsers from spawning at the exact same millisecond
 # which causes CPU spikes and port binding race conditions.
 DRIVER_INIT_LOCK = threading.Lock()
 
 def create_stealth_driver(headless: bool = True):
     """
     Creates a stealth Selenium driver instance using seleniumbase's UC mode.
-    Returns tuple: (driver, user_data_dir_path)
     """
     # Create a unique temporary directory for this specific thread/driver
     user_data_dir = tempfile.mkdtemp()
@@ -29,15 +27,13 @@ def create_stealth_driver(headless: bool = True):
                 uc=SELENIUM_CONFIG["uc_driver"],
                 headless=headless,
                 agent=None,
-                user_data_dir=user_data_dir, # CRITICAL: Isolate the profile
+                user_data_dir=user_data_dir, # Isolate the profile for thread-safe drivers 
                 incognito=False, # UC mode works best without explicit incognito flag if user_data_dir is custom
             )
             
-            # Set window size
             width, height = map(int, SELENIUM_CONFIG["window_size"].split(','))
             driver.set_window_size(width, height)
             
-            # Random tiny sleep to offset port allocation
             time.sleep(random.uniform(0.5, 1.5))
             
             return driver, user_data_dir
@@ -46,10 +42,9 @@ def create_stealth_driver(headless: bool = True):
             shutil.rmtree(user_data_dir, ignore_errors=True)
             raise e
 
-
 def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
     """Wrapper to handle specific pages list instead of range."""
-    # Stagger start times significantly to prevent resource choking
+    # Spawn workers cách nhau 2s để tránh race conditions 
     time.sleep(worker_id * 2.0)
     
     driver = None
@@ -60,15 +55,16 @@ def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
         scraper = Scraper(driver)
         
         for page in pages:
+            # Iterate qua một list các pages và lần lượt scrape URLs của bài đăng từ mỗi page 
             if cb.should_stop(): 
                 break
             
             try:
-                current_url = build_page_url(url, page)
+                current_url = build_page_url(url, page) # Tạo đường link dẫn đến menu page hiện tại 
                 new_urls = scraper.scrape_single_page(current_url)
                 
                 if new_urls:
-                    q.put(new_urls)
+                    q.put(new_urls) # Put all the scraped URLs in a queue 
                     cb.record_success()
                     sm.mark_page_complete("Batdongsan", page)
                     print(f"[Worker {worker_id}] Page {page}: Found {len(new_urls)}")
@@ -94,8 +90,9 @@ def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
 
 
 def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
-    """Worker with Circuit Breaker integration."""
-    start_delay = worker_id * 3.0 # Increase stagger time
+    """Worker to scrape listing details."""
+    # Flows: Chunk toàn bộ URLs cần phải scrape ra thành các subset, spawn các workers để scrape từng subset và put data vào queue khi scrape xong.
+    start_delay = worker_id * 3.0 
     time.sleep(start_delay)
 
     driver = None
