@@ -107,7 +107,11 @@ def scrape_onehousing_details(circuit_breaker: CircuitBreaker):
     )
     writer_thread.start()
 
-    super_batches = list(chunks(urls_to_scrape, DRIVER_RESTART_INTERVAL))
+    batch_size = DRIVER_RESTART_INTERVAL
+    super_batches = [
+        urls_to_scrape[i : i + batch_size] 
+        for i in range(0, len(urls_to_scrape), batch_size)
+    ]
 
     for batch_idx, batch_urls in enumerate(super_batches):
         if circuit_breaker.should_stop():
