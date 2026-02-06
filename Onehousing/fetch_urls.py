@@ -18,12 +18,14 @@ def parse_listing_urls(html: str) -> List[str]:
     
     base_url = get_base_url()
     urls = []
+
     for card in cards:
         href = card.get("href")
         if href:
             if not href.startswith("http"):
                 href = base_url + href
             urls.append(href)
+            
     return urls
 
 def fetch_search_page(page_num, user_agent):

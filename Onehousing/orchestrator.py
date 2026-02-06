@@ -46,6 +46,7 @@ def scrape_onehousing_urls(circuit_breaker: CircuitBreaker, state_manager: Pipel
     
     threads = []
     print(f"[Orchestrator] Starting {len(page_chunks)} URL workers")
+
     for i, chunk in enumerate(page_chunks):
         t = threading.Thread(
             target=onehousing_url_worker, 
@@ -163,7 +164,6 @@ def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.
                 data = extract_listing_details(driver, url)
                 
                 if data:
-                    # data['scraping_time'] = int(time.time())
                     data_queue.put(data)
                     cb.record_success()
                 else:

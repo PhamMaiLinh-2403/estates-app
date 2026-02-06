@@ -40,6 +40,7 @@ def extract_listing_details(driver, url):
         try:
             img_el = driver.find_element(By.XPATH, '//link[@rel="preload" and @as="image"]')
             image_src = img_el.get_attribute("imagesrcset")
+
             if image_src:
                 data["image_url"] = image_src.split(',')[0].strip().split(' ')[0]
         except:
@@ -48,6 +49,7 @@ def extract_listing_details(driver, url):
         # Extract breadcrumbs and geolocation from JSON-LD
         try:
             script_elements = driver.find_elements(By.XPATH, '//script[@type="application/ld+json"]')
+
             for script_el in script_elements:
                 try:
                     json_content = script_el.get_attribute("innerHTML")
@@ -75,6 +77,7 @@ def extract_listing_details(driver, url):
         # Extract features
         try:
             features = driver.find_elements(By.XPATH, '//*[@id="key-feature-item"]')
+            
             for ele in features:
                 try:
                     title = ele.find_element(By.XPATH, './/*[@id="item_title"]').text.strip()

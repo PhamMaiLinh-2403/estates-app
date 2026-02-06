@@ -55,6 +55,7 @@ def csv_url_writer_listener(url_queue: queue.Queue,
                 print("Old file corrupted. Creating new file...")
                 file_exists = False
 
+        # Appending if in reusme mode, delete all old files to start fresh if in new run 
         write_mode = 'a' if file_exists else 'w'
         write_header = not file_exists
 

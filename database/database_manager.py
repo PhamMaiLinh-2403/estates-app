@@ -59,9 +59,6 @@ class DatabaseManager:
             conn.commit()
 
     def extract_data(start_date, end_date, web):
-        # start_date = datetime.strptime(start_date, "%d/%m/%Y").strftime("%Y-%m-%d")
-        # end_date = datetime.strptime(end_date, "%d/%m/%Y").strftime("%Y-%m-%d")
-
         with sqlite3.connect(DATABASE_DIR) as conn:
             cursor = conn.cursor()
             
@@ -127,4 +124,5 @@ class DatabaseManager:
 
         return_df = pd.DataFrame(rows, columns=[column[0] for column in cursor.description])
         return_df.drop_duplicates(subset=dup, inplace=True)
+        
         return return_df

@@ -45,24 +45,3 @@ def retry(max_tries=3, delay_seconds=3, backoff=2, retriable_exceptions=None):
             
         return wrapper
     return decorator
-
-
-# Convenience decorators for common cases
-def retry_on_timeout(max_tries=3, delay_seconds=5):
-    """Retry only on timeout exceptions."""
-    from selenium.common.exceptions import TimeoutException, WebDriverException
-    return retry(
-        max_tries=max_tries,
-        delay_seconds=delay_seconds,
-        retriable_exceptions=(TimeoutException, WebDriverException, ConnectionError)
-    )
-
-
-def retry_on_stale_element(max_tries=3, delay_seconds=2):
-    """Retry only on stale element exceptions."""
-    from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
-    return retry(
-        max_tries=max_tries,
-        delay_seconds=delay_seconds,
-        retriable_exceptions=(StaleElementReferenceException, NoSuchElementException)
-    )

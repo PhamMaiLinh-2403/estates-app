@@ -14,8 +14,10 @@ class OneHousingDataCleaner:
     def _extract_city(row):
         """Extract and standardize city name."""
         city = row.get('city')
+
         if pd.notna(city):
            return str(row["city"]).replace("TP.", "Thành phố").replace('T.', 'Tỉnh').strip()
+        
         else:
             city = row.get('listing_title', '')
             try:
@@ -32,8 +34,10 @@ class OneHousingDataCleaner:
             return str(district).replace("Q.", "Quận").replace("H.", "Huyện").replace("TX.", "Thị xã").strip()
 
         title = row.get('listing_title', '')
+
         if pd.notna(title):
             return title.split(",")[-2].replace('TP.', "Thành phố").replace('Q.', "Quận").replace('H.', "Huyện").replace('TX.', 'Thị xã').strip()
+        
         return np.nan
 
     @staticmethod
@@ -48,6 +52,7 @@ class OneHousingDataCleaner:
                 return np.nan
 
             address_list = full_address.split(",")
+
             try:
                 return address_list[-3].replace("X.", "Xã").replace("P.", "Phường").replace("TT.", "Thị trấn").strip()
             except:
@@ -71,6 +76,7 @@ class OneHousingDataCleaner:
             for p in patterns:
                 if match := re.search(p, str(text), re.IGNORECASE):
                     return re.sub(r'\s*\(.*\)\s*$', '', match.group(1).strip()).strip()
+                
             return np.nan
 
         return series.apply(extract)
@@ -101,6 +107,7 @@ class OneHousingDataCleaner:
             if 'triệu' in val_str:
                 return float(val_str.replace('triệu', '').strip()) * 1e6
             return float(val_str)
+        
         except (ValueError, AttributeError):
             return np.nan
 
@@ -129,6 +136,7 @@ class OneHousingDataCleaner:
             r"Hướng mặt tiền\s*:[^;-]+?-\s*(\d+(?:\.\d+)?)\s*m",
             r"Nhà mặt tiền\s+(\d+(?:\.\d+)?)\s*m"
         ]
+        
         for text in sources:
             if pd.notna(text):
                 for p in patterns:

@@ -1,9 +1,6 @@
 import threading
 import json
-import os
 import pandas as pd
-from datetime import datetime, timedelta
-from pathlib import Path
 
 from .config import * 
 
@@ -24,6 +21,9 @@ class CircuitBreaker:
                 self.consecutive_failures = 0
 
     def record_failure(self, error_type: str):
+        """
+        Create stop signal when encountering critical errors. 
+        """
         with self.lock:
             self.consecutive_failures += 1
             
@@ -33,16 +33,16 @@ class CircuitBreaker:
             if any(error_type.startswith(prefix) for prefix in critical_prefixes):
                 self.is_open = True
                 self.stop_reason = f"Critical Error: {error_type}"
-                print(f"[Circuit Breaker] OPEN: {self.stop_reason}")
+                print(f"Stop Reason: {self.stop_reason}")
                 return True
 
             if self.consecutive_failures >= self.threshold:
                 self.is_open = True
                 self.stop_reason = f"Threshold reached: {self.consecutive_failures} consecutive failures (last: {error_type})"
-                print(f"[Circuit Breaker] OPEN: {self.stop_reason}")
+                print(f"Threshold reached. Stop reason: {self.stop_reason}")
                 return True
             else:
-                print(f"[Circuit Breaker] Failure {self.consecutive_failures}/{self.threshold}: {error_type}")
+                print(f"Failure {self.consecutive_failures}/{self.threshold}: {error_type}")
             
         return False
 

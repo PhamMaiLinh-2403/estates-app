@@ -2,7 +2,6 @@ import argparse
 import pandas as pd
 import os
 from datetime import datetime
-import time
 import traceback
 
 from commons.config import *
@@ -61,10 +60,12 @@ def clean():
             print(f'Adding raw Batdongsan data to the database at {datetime.now()}...')
             DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
             print(f'Finished adding raw data of Batdongsan at {datetime.now()}!')
+
         if DETAILS_CSV_PATH['Onehousing'].exists():
             print(f'Adding raw Onehousing data to the database at {datetime.now()}...')
             DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
             print(f'Finished adding raw data of Onehousing at {datetime.now()}!')
+
     except Exception as e:
         print(f"Error syncing raw data: {e}")
 
@@ -72,15 +73,19 @@ def clean():
     try:
         print(f'Cleaning Batdongsan data at {datetime.now()}...')
         df_bds_clean = process_batdongsan_data()
+
         if not df_bds_clean.empty:
             df_bds_clean['Web'] = 'Batdongsan'
+
         print(f'Finished cleaning Batdongsan data at {datetime.now()}!')
 
         print(f'Cleaning Onehousing data at {datetime.now()}...')
         df_oh_clean = process_onehousing_data()
+        
         if not df_oh_clean.empty:
             df_oh_clean['Web'] = 'Onehousing'
             df_oh_clean['Thời điểm giao dịch/rao bán'] = '20/01/2026' # datetime.now().strftime("%d/%m/%Y")
+            
         print(f'Finished cleaning Onehousing data at {datetime.now()}!')
 
         df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
