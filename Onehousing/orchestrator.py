@@ -33,7 +33,7 @@ def scrape_onehousing_urls(circuit_breaker: CircuitBreaker, state_manager: Pipel
 
     # State Check
     completed = state_manager.get_completed_pages("Onehousing")
-    all_pages = list(range(START_PAGE_NUMBER, END_PAGE_NUMBER + 1))
+    all_pages = list(range(START_PAGE_NUMBER, ONEHOUSING_END_PAGE_NUMBER + 1))
     pending_pages = [p for p in all_pages if p not in completed]
 
     if not pending_pages:

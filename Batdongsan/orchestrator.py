@@ -28,7 +28,7 @@ def scrape_urls_multithreaded(circuit_breaker: CircuitBreaker, state_manager: Pi
 
     # Filter out pages already done
     completed_pages = state_manager.get_completed_pages("Batdongsan")
-    all_pages = list(range(START_PAGE_NUMBER, END_PAGE_NUMBER + 1))
+    all_pages = list(range(START_PAGE_NUMBER, BDS_END_PAGE_NUMBER + 1))
     pending_pages = [p for p in all_pages if p not in completed_pages]
 
     if not pending_pages:
