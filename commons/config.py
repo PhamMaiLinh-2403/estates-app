@@ -29,16 +29,16 @@ SELENIUM_CONFIG = {
 # =============================================================================
 # SCRAPER SETTINGS
 # =============================================================================
-MAX_WORKERS = 8 
+MAX_WORKERS = 6 
 MAX_RETRIES = 3
 RETRY_DELAY = 2          
 SELENIUM_WAIT_TIME = 5   
 DRIVER_RESTART_INTERVAL = 5000
-BATCH_COOLDOWN_SECONDS = 600 
+BATCH_COOLDOWN_SECONDS = 200 
 
 START_PAGE_NUMBER = 1
-BDS_END_PAGE_NUMBER = 2500 
-ONEHOUSING_END_PAGE_NUMBER = 400
+BDS_END_PAGE_NUMBER = 2000
+ONEHOUSING_END_PAGE_NUMBER = 500 
 TOTAL_PAGES = 0
 LOG_LEVEL = "INFO"
 
