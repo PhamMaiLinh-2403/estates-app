@@ -180,17 +180,7 @@ def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.
     except Exception as e:
         print(f"[Worker {worker_id}] Fatal: {e}")
     finally:
-        if driver:
-            try: 
-                driver.quit()
-            except: 
-                pass
-        # Clean up temp dir
-        if user_data_dir and os.path.exists(user_data_dir):
-            try:
-                shutil.rmtree(user_data_dir, ignore_errors=True)
-            except:
-                pass
+        safe_driver_quit(driver, user_data_dir)
 
 def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schema=FINAL_SCHEMA):
     "Orchestrate cleaning logic for Onehousing data."

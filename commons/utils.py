@@ -1,3 +1,13 @@
+import os
+import platform
+import tempfile
+import glob
+import shutil 
+import time 
+import psutil 
+from selenium.common.exceptions import WebDriverException
+
+
 def build_page_url(search_page_url, page_number):
     """Constructs urls for pagination."""
     if page_number == 1:
@@ -14,3 +24,86 @@ def chunks(iterable, n):
         start = i * k + min(i, m)
         end = (i + 1) * k + min(i + 1, m)
         yield lst[start:end]
+
+def kill_system_chrome_processes():
+    """
+    Forcefully kills all chrome and chromedriver processes on the system.
+    """
+    system_platform = platform.system()
+    try:
+        if system_platform == "Windows":
+            # /F = Force, /IM = Image Name, /T = Kill child processes too
+            os.system("taskkill /F /IM chrome.exe /T >nul 2>&1")
+            os.system("taskkill /F /IM chromedriver.exe /T >nul 2>&1")
+        else:
+            # Linux/MacOS
+            os.system("pkill -f chrome > /dev/null 2>&1")
+            os.system("pkill -f chromedriver > /dev/null 2>&1")
+            
+        print("Executed global Chrome cleanup.")
+    except Exception as e:
+        print(f"Warning: Could not run cleanup command: {e}")
+
+def clean_scraper_temp_dirs():
+    tmp_dir = tempfile.gettempdir()
+    targets = glob.glob(os.path.join(tmp_dir, "bds_scraper_*")) # Find folders starting with bds_scraper_
+    
+    count = 0
+    for path in targets:
+        try:
+            shutil.rmtree(path, ignore_errors=True)
+            count += 1
+        except Exception:
+            pass
+
+    print(f"[System] Cleaned {count} temporary browser profiles.")
+
+def safe_driver_quit(driver, user_data_dir=None):
+    """
+    Aggressively quits the driver. If graceful quit hangs, it forces a kill on the PID.
+    """
+    if not driver:
+        return
+
+    # 1. Grab PID before trying to quit
+    driver_pid = None
+    try:
+        if hasattr(driver, 'service') and hasattr(driver.service, 'process'):
+            driver_pid = driver.service.process.pid
+        elif hasattr(driver, 'process'):
+            driver_pid = driver.process.pid
+    except Exception:
+        pass
+
+    # 2. Try Graceful Quit
+    try:
+        driver.quit()
+    except Exception:
+        pass
+
+    # 3. Double Tap: Force Kill the Process ID if it still exists
+    if driver_pid:
+        try:
+            if psutil.pid_exists(driver_pid):
+                proc = psutil.Process(driver_pid)
+                # Kill children (renderer processes)
+                for child in proc.children(recursive=True):
+                    try:
+                        child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+                # Kill parent (browser)
+                proc.kill()
+                print(f"[System] Force killed stuck driver PID: {driver_pid}")
+        except (psutil.NoSuchProcess, Exception):
+            pass
+
+    # 4. Cleanup Temp Dir
+    if user_data_dir and os.path.exists(user_data_dir):
+        try:
+            import shutil
+            # Wait a tiny bit for file locks to release, then delete
+            time.sleep(0.1) 
+            shutil.rmtree(user_data_dir, ignore_errors=True)
+        except Exception:
+            pass

@@ -5,6 +5,7 @@ from datetime import datetime
 import traceback
 
 from commons.config import *
+from commons.utils import * 
 from commons.state_manager import PipelineStateManager, CircuitBreaker, PipelineStopException
 from database.database_manager import DatabaseManager
 from database.schema import *
@@ -107,6 +108,11 @@ def run_pipeline_safe(resume=False, target_phase="full"):
     Runs the pipeline with fault tolerance.
     target_phase options: "full", "urls", "details"
     """
+    # Before starting (especially on retry), kill any zombies to avoid resource exhaustion.
+    print("Performing Chrome cleanup...")
+    kill_system_chrome_processes()
+    clean_scraper_temp_dirs()
+
     state_manager = PipelineStateManager()
     circuit_breaker = CircuitBreaker() 
 
@@ -164,6 +170,7 @@ def run_pipeline_safe(resume=False, target_phase="full"):
         except Exception as clean_err:
             print(f"Warning: Failed to save partial data: {clean_err}")
 
+        kill_system_chrome_processes()
         state_manager.set_suspended()
         return False, str(e)
 
@@ -178,6 +185,7 @@ def run_pipeline_safe(resume=False, target_phase="full"):
         except Exception as clean_err:
             print(f"[System] Warning: Failed to save partial data: {clean_err}")
 
+        kill_system_chrome_processes()
         state_manager.set_suspended()
         return False, str(e)
     

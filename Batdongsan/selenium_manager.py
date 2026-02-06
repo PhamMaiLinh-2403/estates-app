@@ -19,7 +19,7 @@ def create_stealth_driver(headless: bool = True):
     Creates a stealth Selenium driver instance using seleniumbase's UC mode.
     """
     # Create a unique temporary directory for this specific thread/driver
-    user_data_dir = tempfile.mkdtemp()
+    user_data_dir = tempfile.mkdtemp(prefix="bds_scraper_")
 
     with DRIVER_INIT_LOCK:
         try:
@@ -30,6 +30,9 @@ def create_stealth_driver(headless: bool = True):
                 user_data_dir=user_data_dir, # Isolate the profile for thread-safe drivers 
                 incognito=False, # UC mode works best without explicit incognito flag if user_data_dir is custom
             )
+
+            driver.set_page_load_timeout(30) 
+            driver.set_script_timeout(30)
             
             width, height = map(int, SELENIUM_CONFIG["window_size"].split(','))
             driver.set_window_size(width, height)
@@ -76,22 +79,11 @@ def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
             except Exception as e:
                 cb.record_failure(str(e))
     finally:
-        if driver:
-            try:
-                driver.quit()
-            except:
-                pass
-        # Clean up the unique profile folder
-        if user_data_dir and os.path.exists(user_data_dir):
-            try:
-                shutil.rmtree(user_data_dir, ignore_errors=True)
-            except:
-                pass
-
+        safe_driver_quit(driver, user_data_dir)
 
 def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
     """Worker to scrape listing details."""
-    # Flows: Chunk toàn bộ URLs cần phải scrape ra thành các subset, spawn các workers để scrape từng subset và put data vào queue khi scrape xong.
+    # Flows: Chunk toàn bộ URLs cần phải scrape ra thành các subset, spawn các workers để scrape từng subset và đẩy data vào queue khi scrape xong.
     start_delay = worker_id * 3.0 
     time.sleep(start_delay)
 
@@ -130,13 +122,4 @@ def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
     except Exception as e:
         print(f"[Worker {worker_id}] Fatal: {e}")
     finally:
-        if driver: 
-            try:
-                driver.quit()
-            except:
-                pass
-        if user_data_dir and os.path.exists(user_data_dir):
-            try:
-                shutil.rmtree(user_data_dir, ignore_errors=True)
-            except:
-                pass
+        safe_driver_quit(driver, user_data_dir)
