@@ -54,11 +54,11 @@ UNIQUE_INDEX_ONEHOUSING_RAW = """
     unit_price,
     city,
     district,
-    alley_width,
     features
     );
     """
 # Bỏ property_url, latitude, longitude, image_url, thêm property_description
+# Phải bỏ alley_width đi !!!!
 
 CLEANED_TABLE = """
 CREATE TABLE IF NOT EXISTS cleaned(
@@ -120,3 +120,5 @@ UNIQUE_INDEX_CLEANED = """
         "Mục đích sử dụng đất",
         Web);
 """
+
+# Đơn giá đất và Lợi thế kinh doanh của bên Onehousing không có nên không được thêm vào unique index

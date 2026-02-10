@@ -43,8 +43,10 @@ class DatabaseManager:
             conn.commit()
             print("Finished creating database!")
 
-    def add_row_to_table(data_path, table_name):
+    def add_row_to_table(data_path, table_name, clean_raw_func=None):
         df = pd.read_csv(data_path)
+        if clean_raw_func:
+            df = clean_raw_func(df)
         cols = list(df.columns)
         placeholders = ",".join(["?"] * (len(cols)))
         quoted_cols = ",".join(f'"{col}"' for col in cols)

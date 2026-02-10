@@ -75,6 +75,7 @@ class AddressStandardizer:
 
         for province in districts_df['province_name'].unique():
             self.reverse_district[province] = {}
+
             for district_name in districts_df[districts_df['province_name'] == province]['district_name'].unique():
                 district_name_strip = district_name.replace('Thành phố ', '').replace('Thành Phố ', '').replace('Quận ', '').replace('Huyện ', '').replace('Thị xã ', '').replace('Thị Xã ', '').strip()
                 self.reverse_district[province][district_name_strip] = district_name
@@ -128,8 +129,10 @@ class AddressStandardizer:
                 
                 for dis in self.reverse_district[province].keys():
                     similarity = fuzz.ratio(district_value, dis)
+
                     if similarity >= 66:
                         return self.reverse_district[province][dis]
+                    
                 return None
             
             return None
@@ -144,6 +147,7 @@ class AddressStandardizer:
             
             for ward in self.reverse_ward[province_value][district_value].keys():
                 similarity = fuzz.ratio(ward_value, ward)
+
                 if similarity >= 66:
                     return self.reverse_ward[province_value][district_value][ward]
                 
@@ -174,6 +178,7 @@ class AddressStandardizer:
                         match_result = match_result[0]
                         result_split = match_result.split()
                         result = ' '.join(i.capitalize() for i in result_split)
+
                         return result
                     
                 elif 'phường' in short_add.lower():
@@ -183,22 +188,27 @@ class AddressStandardizer:
                         match_result = match_result[0]
                         result_split = match_result.split()
                         result = ' '.join(i.capitalize() for i in result_split)
+
                         return result
                     
                 elif 'thị trấn' in short_add.lower():
                     match_result = re.search(pattern='(thị trấn [\w\s]+)', string=short_add.lower())
+
                     if match_result:
                         match_result = match_result[0]
                         result_split = match_result.split()
                         result = ' '.join(i.capitalize() for i in result_split)
+
                         return result
                     
                 else:
                     short_add_list = row['short_address'].split(',')
+                    
                     if len(short_add_list) >= 3:
                         new_province_val = row['Tỉnh/Thành phố']
                         new_ward_val = normalize('NFC',short_add_list[-3].strip())
                         new_district_val = row['Thành phố/Quận/Huyện/Thị xã']
+
                         return matching(new_ward_val, new_district_val, new_province_val)
 
             else:

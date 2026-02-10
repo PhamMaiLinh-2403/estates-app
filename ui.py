@@ -161,7 +161,7 @@ def schedule_retry_if_needed():
 # Add the Weekly Job (New Run)
 scheduler.add_job(
     weekly_pipeline_job,
-    CronTrigger(day_of_week='thu', hour=12, minute=15),
+    CronTrigger(day_of_week='fri', hour=18, minute=0),
     id="weekly_scrape"
 )
 

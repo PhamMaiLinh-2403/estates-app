@@ -42,6 +42,8 @@ def create_driver(headless=True):
 
     try:
         driver = webdriver.Chrome(options=options)
+        driver.set_page_load_timeout(30)
+        driver.set_script_timeout(30)
         return driver, user_data_dir
     except Exception as e:
         shutil.rmtree(user_data_dir, ignore_errors=True)
