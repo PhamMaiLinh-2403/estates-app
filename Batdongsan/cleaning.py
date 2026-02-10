@@ -88,10 +88,12 @@ class DataCleaner:
             pass
 
         short_address = row.get("short_address")
+
         if pd.notna(short_address):
             parts = [p.strip() for p in str(short_address).split(",")]
             if parts:
                 return parts[-1]
+            
         return None
 
     @staticmethod
@@ -104,16 +106,19 @@ class DataCleaner:
             pass
 
         short_address = row.get("short_address")
+
         if pd.notna(short_address):
             parts = [p.strip() for p in str(short_address).split(",")]
             if len(parts) >= 2:
                 return parts[-2]
+            
         return None
 
     @staticmethod
     def extract_ward(row):
         """Extracts the ward (Phường/Xã/Thị trấn) from the address."""
         short_address = str(row.get("short_address", "")).strip()
+
         if pd.notna(short_address) and isinstance(short_address, str):
             parts = [p.strip() for p in short_address.split(",")]
             for part in parts:
@@ -136,6 +141,7 @@ class DataCleaner:
     def extract_street(row):
         """Extracts the street name from the address."""
         short_address = str(row.get("short_address", "")).strip()
+
         if short_address:
             parts = [p.strip() for p in short_address.split(",")]
             for part in parts:
@@ -144,6 +150,7 @@ class DataCleaner:
                     return match.group(0).title().strip()
 
         parts_raw = str(row.get("address_parts", "")).strip()
+
         if parts_raw:
             try:
                 addr_list = json.loads(parts_raw)
@@ -156,6 +163,7 @@ class DataCleaner:
                 pass
 
         title = str(row.get("title", "")).strip()
+        
         if title:
             m = re.search(r"(đường|phố|quốc lộ|đại lộ|xa lộ)\s+([\w\s\d\-]+?)(?:,|$|\s-|\s--|\()", title, re.IGNORECASE)
             if m and len(m.group(0).split()) <= 5:

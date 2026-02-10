@@ -5,6 +5,7 @@ import glob
 import shutil 
 import time 
 import psutil 
+import socket 
 from selenium.common.exceptions import WebDriverException
 
 
@@ -107,3 +108,29 @@ def safe_driver_quit(driver, user_data_dir=None):
             shutil.rmtree(user_data_dir, ignore_errors=True)
         except Exception:
             pass
+
+def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
+    """
+    Check if the Internet connection is established. 
+    """
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except socket.error:
+        return False
+
+def wait_for_internet(max_retries=10, wait_seconds=30):
+    """
+    Blocks execution until internet is available or retries are exhausted.
+    """
+    print("Checking internet connectivity...")
+    for i in range(max_retries):
+        if check_internet_connection():
+            print("Internet connection confirmed.")
+            return True
+        print(f"No internet. Retrying in {wait_seconds}s ({i+1}/{max_retries})...")
+        time.sleep(wait_seconds)
+    
+    print("Error: Internet is down. Aborting pipeline start.")
+    return False
