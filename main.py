@@ -19,6 +19,7 @@ from Batdongsan.orchestrator import (
 from Onehousing.orchestrator import (
     scrape_onehousing_urls as scrape_oh_urls, 
     scrape_onehousing_details as scrape_oh_details,
+    clean_raw,
     process_onehousing_data
 )
 
@@ -64,7 +65,7 @@ def clean():
 
         if DETAILS_CSV_PATH['Onehousing'].exists():
             print(f'Adding raw Onehousing data to the database at {datetime.now()}...')
-            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw")
+            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw", clean_raw)
             print(f'Finished adding raw data of Onehousing at {datetime.now()}!')
 
     except Exception as e:

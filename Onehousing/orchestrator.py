@@ -182,15 +182,42 @@ def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.
     finally:
         safe_driver_quit(driver, user_data_dir)
 
+def clean_raw(raw_df):
+    # Bỏ các cột null property_url và listing_title 
+    raw_df.dropna(subset=['property_url', 'listing_title'], inplace=True)
+
+    # Thay thế các cột có \r\n thành \n
+    for col in ['listing_title', 'city', 'district', 'alley_width', 'features', 'property_description']:
+        raw_df[col] = raw_df[col].str.replace('\r\n', '\n').str.strip()
+    
+    # Xử lý các trường hợp property_id bị null
+    extracted_ids = raw_df['property_url'].str.split('.').str[-1]
+    raw_df['property_id'] = raw_df['property_id'].fillna(extracted_ids)
+
+    # Xử lý các đoạn bị null city, district
+    extracted_city = raw_df['listing_title'].str.split(',').str[-1]
+    extracted_district = raw_df['listing_title'].str.split(',').str[-2]
+    raw_df['city'] = raw_df['city'].fillna(extracted_city)
+    raw_df['district'] = raw_df['district'].fillna(extracted_district)
+
+    # Dropna nếu dòng có giá trị NULL trong các cột bắt buộc
+    raw_df.dropna(subset=['listing_title', 'total_price', 'city', 'district'], inplace=True)
+
+    # Drop duplicates nếu có
+    raw_df.drop_duplicates(inplace=True)
+
+    return raw_df
+
 def process_onehousing_data(raw_path=DETAILS_CSV_PATH['Onehousing'], final_schema=FINAL_SCHEMA):
     "Orchestrate cleaning logic for Onehousing data."
     if not raw_path.exists():
         return pd.DataFrame()
 
     df_raw = pd.read_csv(raw_path)
+    df_raw = clean_raw(df_raw)
     old_size = df_raw.shape[0]
-    df_raw = df_raw.drop_duplicates(subset=['property_id', 'listing_title', 'total_price', 'unit_price', 'city', 'district', 'alley_width', 'features', 'property_description'])
-    print(f'Dropped {old_size - df_raw.shape[0]} duplicated raw rows for Onehousing.')
+    # df_raw = df_raw.drop_duplicates(subset=['property_id', 'listing_title', 'total_price', 'unit_price', 'city', 'district', 'alley_width', 'features', 'property_description'])
+    # print(f'Dropped {old_size - df_raw.shape[0]} duplicated raw rows for Onehousing.')
     df = OneHousingDataCleaner.clean_onehousing_data(df_raw)
 
     # Rename to standardized schema

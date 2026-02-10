@@ -239,7 +239,7 @@ class OneHousingDataCleaner:
         total_floors = 0.0
 
         if "đất nền" in text:
-            return ""
+            return 0
 
         total_floors += float(floor.group(1)) if floor else 0.0
         total_floors += float(basement.group(1)) if basement else 0.0
