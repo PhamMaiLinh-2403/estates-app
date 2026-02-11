@@ -7,6 +7,7 @@ import uuid
 import pandas as pd
 import threading
 import traceback
+import socket 
 from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings("ignore")
@@ -33,10 +34,11 @@ scrape_state = {
 }
 
 scrape_lock = threading.Lock()
+scheduler_lock_socket = None
 scheduler = BackgroundScheduler(timezone="Asia/Ho_Chi_Minh") 
 
 
-# 1. AUTOMATIC DETECTION LOGIC
+# 1. SCHEDULER AND RECORVERY DETECTION SETUP 
 
 @app.on_event("startup")
 def check_pipeline_recovery():
@@ -55,8 +57,29 @@ def check_pipeline_recovery():
             id=f"auto_resume_{int(datetime.now().timestamp())}"
         )
 
+def start_scheduler():
+    # 1. TRY TO ACQUIRE LOCK
+    if not acquire_scheduler_lock():
+        print("[System] Scheduler Lock Failed: Another instance is already running the scheduler.")
+        return
 
-# 2. JOB WRAPPERS (Define Intent)
+    # 2. IF WE GOT THE LOCK, START THE SCHEDULER
+    print("[System] Scheduler Lock Acquired. Starting Background Scheduler...")
+    
+    # Check for recovery
+    check_pipeline_recovery()
+    
+    # Add your jobs
+    scheduler.add_job(
+        weekly_pipeline_job,
+        CronTrigger(day_of_week='wed', hour=15, minute=0),
+        id="weekly_scrape"
+    )   
+    scheduler.start()
+
+start_scheduler()
+
+# 2. JOB WRAPPERS 
 
 def weekly_pipeline_job():
     """
@@ -155,20 +178,23 @@ def schedule_retry_if_needed():
         replace_existing=True
     )
 
+def acquire_scheduler_lock():
+    """
+    Try to bind to a specific port. 
+    If successful, return True (we are the main process).
+    If failed (port in use), return False (we are a duplicate worker).
+    """
+    global scheduler_lock_socket
+    try:
+        scheduler_lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Bind to a high port on localhost
+        scheduler_lock_socket.bind(("127.0.0.1", 49152)) 
+        return True
+    except socket.error:
+        return False
+    
 
-# 3. SCHEDULER SETUP
-
-# Add the Weekly Job (New Run)
-scheduler.add_job(
-    weekly_pipeline_job,
-    CronTrigger(day_of_week='fri', hour=18, minute=0),
-    id="weekly_scrape"
-)
-
-# Start Scheduler
-scheduler.start()
-
-# 4. API ROUTES 
+# 3. API ROUTES 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
