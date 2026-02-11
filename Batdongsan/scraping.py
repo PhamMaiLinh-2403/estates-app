@@ -174,3 +174,45 @@ class Scraper:
             except (json.JSONDecodeError, TypeError):
                 continue
         return []
+    
+class PhoneScraper:
+    """
+    Manages logging in and scraping contacts from posts, based on a Selenium instance. 
+    """
+    def __init__(self, driver: WebDriver):
+        self.driver = driver
+
+    def log_in_account(self, account):
+        pass 
+
+    def extract_phone_number(self, url):
+        """
+        Function to extract the phone number. 
+        """
+        try:
+            self.driver.get(url)
+
+            # Click on the button to make the phone number visible 
+            phone_button = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div[kyc-tracking-id="lead-phone-ldp"]'))
+            )
+            phone_button.click()
+
+            # Ensure that the mobile number have appeared after clicking 
+            WebDriverWait(self.driver, 10).until(
+                    lambda driver: driver.find_element(
+                        By.CSS_SELECTOR, 
+                        'div[lead-tracking-id="lead-phone-ldp"]'
+                    ).get_attribute("mobile") not in [None, ""]
+                )
+
+            # Get the mobile number
+            mobile_number = self.driver.find_element(
+                                By.CSS_SELECTOR, 
+                                'div[lead-tracking-id="lead-phone-ldp"]'
+                            ).get_attribute("mobile")
+            
+            return mobile_number 
+            
+        except (TimeoutException, Exception) as e:
+            print(f"Fail to extract phone number for {url}: {e}")

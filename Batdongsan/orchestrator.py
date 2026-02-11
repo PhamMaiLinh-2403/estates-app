@@ -14,6 +14,10 @@ from commons.state_manager import CircuitBreaker, PipelineStateManager, Pipeline
 from .selenium_manager import *
 from .address_standardizer import AddressStandardizer 
 from .cleaning import DataCleaner, DataImputer, FeatureEngineer
+from .account_manager import AccountPool
+
+
+# === FUNCTIONS FOR SCRAPING ===
 
 def scrape_urls_multithreaded(circuit_breaker: CircuitBreaker, state_manager: PipelineStateManager):
     """Phase 1: Scrape listing URLs."""
@@ -132,6 +136,10 @@ def scrape_details_multithreaded(circuit_breaker: CircuitBreaker):
 
     print("\n[Batdongsan] Detail scraping completed.")
 
+def scrape_phone_numbers(circuit_breaker: CircuitBreaker, pool = AccountPool):
+    pass 
+
+# === FUNCTIONS FOR CLEANING === 
 def process_batdongsan_data(raw_path=DETAILS_CSV_PATH['Batdongsan'], final_schema=FINAL_SCHEMA):
     """Orchestrate cleaning logic for Batdongsan data."""
     if not raw_path.exists():

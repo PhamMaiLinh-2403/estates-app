@@ -37,49 +37,7 @@ scrape_lock = threading.Lock()
 scheduler_lock_socket = None
 scheduler = BackgroundScheduler(timezone="Asia/Ho_Chi_Minh") 
 
-
-# 1. SCHEDULER AND RECORVERY DETECTION SETUP 
-
-@app.on_event("startup")
-def check_pipeline_recovery():
-    """
-    Runs on server start. 
-    Detects if the pipeline was killed (suspended) and auto-resumes.
-    """
-    sm = PipelineStateManager()
-    if sm.is_suspended():
-        print("[System] Detected suspended pipeline state. Auto-rescheduling resume...")
-        # Schedule a resume in 1 minute to allow server to fully boot
-        run_time = datetime.now() + timedelta(minutes=1)
-        scheduler.add_job(
-            retry_pipeline_job,
-            trigger=DateTrigger(run_date=run_time),
-            id=f"auto_resume_{int(datetime.now().timestamp())}"
-        )
-
-def start_scheduler():
-    # 1. TRY TO ACQUIRE LOCK
-    if not acquire_scheduler_lock():
-        print("[System] Scheduler Lock Failed: Another instance is already running the scheduler.")
-        return
-
-    # 2. IF WE GOT THE LOCK, START THE SCHEDULER
-    print("[System] Scheduler Lock Acquired. Starting Background Scheduler...")
-    
-    # Check for recovery
-    check_pipeline_recovery()
-    
-    # Add your jobs
-    scheduler.add_job(
-        weekly_pipeline_job,
-        CronTrigger(day_of_week='wed', hour=15, minute=0),
-        id="weekly_scrape"
-    )   
-    scheduler.start()
-
-start_scheduler()
-
-# 2. JOB WRAPPERS 
+# 1. JOB WRAPPERS 
 
 def weekly_pipeline_job():
     """
@@ -193,6 +151,44 @@ def acquire_scheduler_lock():
     except socket.error:
         return False
     
+
+# 2. SCHEDULER AND RECORVERY DETECTION SETUP 
+
+@app.on_event("startup")
+def check_pipeline_recovery():
+    """
+    Runs on server start. 
+    Detects if the pipeline was killed (suspended) and auto-resumes.
+    """
+    sm = PipelineStateManager()
+    if sm.is_suspended():
+        print("[System] Detected suspended pipeline state. Auto-rescheduling resume...")
+        # Schedule a resume in 1 minute to allow server to fully boot
+        run_time = datetime.now() + timedelta(minutes=1)
+        scheduler.add_job(
+            retry_pipeline_job,
+            trigger=DateTrigger(run_date=run_time),
+            id=f"auto_resume_{int(datetime.now().timestamp())}"
+        )
+
+def start_scheduler():
+    if not acquire_scheduler_lock():
+        print("[System] Scheduler Lock Failed: Another instance is already running the scheduler.")
+        return
+    
+    print("[System] Scheduler Lock Acquired. Starting Background Scheduler...")
+    check_pipeline_recovery()
+    
+    # Add jobs
+    scheduler.add_job(
+        weekly_pipeline_job,
+        CronTrigger(day_of_week='wed', hour=15, minute=0),
+        id="weekly_scrape"
+    )   
+    scheduler.start()
+
+start_scheduler()
+
 
 # 3. API ROUTES 
 
