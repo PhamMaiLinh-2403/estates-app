@@ -122,10 +122,12 @@ class OneHousingDataCleaner:
         for text in [row.get("alley_width"), row.get("property_description")]:
             if pd.notna(text):
                 if nums := re.findall(r"(\d+(?:\.\d+)?)", str(text)):
+
                     try:
                         return min(float(n) for n in nums)
                     except ValueError:
                         continue
+
         return np.nan
 
     @staticmethod
@@ -253,17 +255,8 @@ class OneHousingDataCleaner:
         if total_floors > 1 and float(basement.group(1)) == 0:
             return 9_500_000
         
-        return np.nan
+        return 4_000_000 
     
-    @staticmethod
-    def _extract_unit_price(row):
-        text = str(row.get("listing_title", "")).lower()
-
-        # Nếu bài đăng bán đất nền, sử dụng công thức: Đơn giá đất = Giá ước tính / Diện tích đất
-        # Nếu bài đăng bán nhà, sử dụng công thức: Lấy giá đất chia cho giá xây dựng ước tính
-        # Giá xây dựng = Đơn giá xây dựng * Tổng diện tích sàn * Chất lượng còn lại
-        # Đơn giá đất = Giá ước tính - Giá xây dựng
-
     @staticmethod
     def clean_onehousing_data(df: pd.DataFrame) -> pd.DataFrame:
         """
