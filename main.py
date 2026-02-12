@@ -103,6 +103,56 @@ def clean():
         print(f"Cleaning error: {e}")
         traceback.print_exc()
 
+def clean_test():
+    if not os.path.exists(DATABASE_DIR_TEST):
+        DatabaseManager.create_db() 
+
+    # Add raw data (Ignore duplicates handled by SQL)
+    try:
+        if DETAILS_CSV_PATH['Batdongsan'].exists():
+            print(f'Adding raw Batdongsan data to the database at {datetime.now()}...')
+            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
+            print(f'Finished adding raw data of Batdongsan at {datetime.now()}!')
+
+        if DETAILS_CSV_PATH['Onehousing'].exists():
+            print(f'Adding raw Onehousing data to the database at {datetime.now()}...')
+            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw", clean_raw)
+            print(f'Finished adding raw data of Onehousing at {datetime.now()}!')
+
+    except Exception as e:
+        print(f"Error syncing raw data: {e}")
+
+    # Clean data
+    # try:
+    #     print(f'Cleaning Batdongsan data at {datetime.now()}...')
+    #     df_bds_clean = process_batdongsan_data()
+
+    #     if not df_bds_clean.empty:
+    #         df_bds_clean['Web'] = 'Batdongsan'
+
+    #     print(f'Finished cleaning Batdongsan data at {datetime.now()}!')
+
+    #     print(f'Cleaning Onehousing data at {datetime.now()}...')
+    #     df_oh_clean = process_onehousing_data()
+        
+    #     if not df_oh_clean.empty:
+    #         df_oh_clean['Web'] = 'Onehousing'
+    #         df_oh_clean['Thời điểm giao dịch/rao bán'] = '20/01/2026' # datetime.now().strftime("%d/%m/%Y")
+            
+    #     print(f'Finished cleaning Onehousing data at {datetime.now()}!')
+
+    #     df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
+        
+    #     if not df_cleaned.empty:
+    #         df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
+    #         DatabaseManager.add_row_to_table(CLEANED_CSV_PATH, "cleaned")
+    #         print(f"Finished adding data to the database at {datetime.now()}!")
+    #     else:
+    #         print("No cleaned data produced.")
+            
+    # except Exception as e:
+    #     print(f"Cleaning error: {e}")
+    #     traceback.print_exc()
 
 def run_pipeline_safe(resume=False, target_phase="full"):
     """

@@ -87,6 +87,7 @@ WARDS_SQL_FILE = ADMIN_DATA_DIR / "wards_20250225_2.sql"
 STREETS_SQL_FILE = ADMIN_DATA_DIR / "streets_20250225_2.sql"
 INFO_FILE = INFO_DATA_DIR / "Dữ liệu thông tin kỹ thuật tài sản.xlsx"
 DATABASE_DIR = OUTPUT_DIR / "real_estate.db"
+DATABASE_DIR_TEST = OUTPUT_DIR / "real_estate_test.db"
 
 # =============================================================================
 # DETAILS SCRAPING CONFIGURATION

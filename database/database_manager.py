@@ -45,7 +45,7 @@ class DatabaseManager:
 
     def add_row_to_table(data_path, table_name, clean_raw_func=None):
         df = pd.read_csv(data_path)
-        if clean_raw_func:
+        if table_name == 'onehousing_raw' and clean_raw_func is not None:
             df = clean_raw_func(df)
         cols = list(df.columns)
         placeholders = ",".join(["?"] * (len(cols)))
