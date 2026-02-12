@@ -104,7 +104,7 @@ def clean():
         traceback.print_exc()
 
 def clean_test():
-    if not os.path.exists(DATABASE_DIR_TEST):
+    if not os.path.exists(DATABASE_DIR):
         DatabaseManager.create_db() 
 
     # Add raw data (Ignore duplicates handled by SQL)
