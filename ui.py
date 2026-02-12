@@ -261,13 +261,13 @@ start_scheduler()
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    if scrape_state["running"]:
-        return RedirectResponse("/system-busy")
+    # if scrape_state["running"]:
+    #     return RedirectResponse("/system-busy")
     return templates.TemplateResponse("home.html", {"request": request})
 
-@app.get("/system-busy", response_class=HTMLResponse)
-async def system_busy(request: Request):
-    return templates.TemplateResponse("system_busy.html", {"request": request})
+# @app.get("/system-busy", response_class=HTMLResponse)
+# async def system_busy(request: Request):
+#     return templates.TemplateResponse("system_busy.html", {"request": request})
 
 @app.get("/system-status")
 def system_status():
