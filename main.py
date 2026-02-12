@@ -110,9 +110,9 @@ def run_pipeline_safe(resume=False, target_phase="full"):
     target_phase options: "full", "urls", "details"
     """
     # Before starting (especially on retry), kill any zombies to avoid resource exhaustion.
-    # print("Performing Chrome cleanup...")
-    # kill_system_chrome_processes()
-    # clean_scraper_temp_dirs()
+    print("Performing Chrome cleanup...")
+    kill_system_chrome_processes()
+    clean_scraper_temp_dirs()
 
     state_manager = PipelineStateManager()
     circuit_breaker = CircuitBreaker() 

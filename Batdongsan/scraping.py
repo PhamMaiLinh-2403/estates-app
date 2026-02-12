@@ -174,3 +174,86 @@ class Scraper:
             except (json.JSONDecodeError, TypeError):
                 continue
         return []
+    
+class PhoneScraper:
+    """
+    Manages logging in and scraping contacts from posts, based on a Selenium instance. 
+    """
+    def __init__(self, driver: WebDriver):
+        self.driver = driver
+
+    def log_in_account(self, account):
+        try:
+            self.driver.get(BASE_URL["Batdongsan"])
+
+            # Click on the log in button
+            login_button = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located(By.ID, "kct_login"))
+            login_button.click()
+
+            # Wait until the iframe log in window appears 
+            iframe = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((
+                    By.CSS_SELECTOR,
+                    'iframe[src="https://batdongsan.com.vn/sellernet/internal-sign-in"]'
+                ))
+            )
+
+            self.driver.switch_to.frame(iframe)
+
+            # Type in username and passwords 
+            username_input = WebDriverWait(self.driver, 10).until(
+                EC.visibility_of_element_located((By.NAME, "username"))
+            )
+            username_input.clear()
+            username_input.send_keys(account[0])
+            
+            password_input = WebDriverWait(self.driver, 10).until(
+                EC.visibility_of_element_located((By.NAME, "password"))
+            )
+            password_input.clear()
+            password_input.send_keys(account[1])
+
+            signin_button = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.ID, "signin-button"))
+            )
+            signin_button.click()
+
+            time.sleep(3)
+
+            # Switch back to main content
+            self.driver.switch_to.default_content()
+
+        except (TimeoutException, NoSuchElementException, Exception) as e:
+            print(f"Fail to log in: {e}")
+
+    def extract_phone_number(self, url):
+        """
+        Function to extract the phone number. 
+        """
+        try:
+            self.driver.get(url)
+
+            # Click on the button to make the phone number visible 
+            phone_button = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'div[kyc-tracking-id="lead-phone-ldp"]'))
+            )
+            phone_button.click()
+
+            # Ensure that the mobile number have appeared after clicking 
+            WebDriverWait(self.driver, 10).until(
+                    lambda driver: driver.find_element(
+                        By.CSS_SELECTOR, 
+                        'div[lead-tracking-id="lead-phone-ldp"]'
+                    ).get_attribute("mobile") not in [None, ""]
+                )
+
+            # Get the mobile number
+            mobile_number = self.driver.find_element(
+                                By.CSS_SELECTOR, 
+                                'div[lead-tracking-id="lead-phone-ldp"]'
+                            ).get_attribute("mobile")
+            
+            return mobile_number 
+            
+        except (TimeoutException, Exception) as e:
+            print(f"Fail to extract phone number for {url}: {e}")
