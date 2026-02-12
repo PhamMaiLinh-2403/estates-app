@@ -183,7 +183,48 @@ class PhoneScraper:
         self.driver = driver
 
     def log_in_account(self, account):
-        pass 
+        try:
+            self.driver.get(BASE_URL["Batdongsan"])
+
+            # Click on the log in button
+            login_button = WebDriverWait(self.driver, 10).until(EC.presence_of_element_located(By.ID, "kct_login"))
+            login_button.click()
+
+            # Wait until the iframe log in window appears 
+            iframe = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((
+                    By.CSS_SELECTOR,
+                    'iframe[src="https://batdongsan.com.vn/sellernet/internal-sign-in"]'
+                ))
+            )
+
+            self.driver.switch_to.frame(iframe)
+
+            # Type in username and passwords 
+            username_input = WebDriverWait(self.driver, 10).until(
+                EC.visibility_of_element_located((By.NAME, "username"))
+            )
+            username_input.clear()
+            username_input.send_keys(account[0])
+            
+            password_input = WebDriverWait(self.driver, 10).until(
+                EC.visibility_of_element_located((By.NAME, "password"))
+            )
+            password_input.clear()
+            password_input.send_keys(account[1])
+
+            signin_button = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.ID, "signin-button"))
+            )
+            signin_button.click()
+
+            time.sleep(3)
+
+            # Switch back to main content
+            self.driver.switch_to.default_content()
+
+        except (TimeoutException, NoSuchElementException, Exception) as e:
+            print(f"Fail to log in: {e}")
 
     def extract_phone_number(self, url):
         """

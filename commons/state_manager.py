@@ -2,7 +2,8 @@ import threading
 import json
 import pandas as pd
 
-from .config import * 
+from .config import *
+from commons.utils import * 
 
 class CircuitBreaker:
     def __init__(self):
@@ -48,7 +49,18 @@ class CircuitBreaker:
 
     def should_stop(self):
         with self.lock:
-            return self.is_open
+            # 1. Check existing errors
+            if self.is_open:
+                return True
+            
+            # 2. Check Time Window
+            if not is_safe_working_hour():
+                self.is_open = True
+                self.stop_reason = "Reached end of working hours (17:45)."
+                print(f"{self.stop_reason} Stopping pipeline safely.")
+                return True
+                
+            return False
         
 
 class PipelineStateManager:

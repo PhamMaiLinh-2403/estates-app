@@ -6,6 +6,7 @@ import shutil
 import time 
 import psutil 
 import socket 
+from datetime import datetime, time as dtime
 from selenium.common.exceptions import WebDriverException
 
 
@@ -134,4 +135,27 @@ def wait_for_internet(max_retries=10, wait_seconds=30):
         time.sleep(wait_seconds)
     
     print("Error: Internet is down. Aborting pipeline start.")
+    return False
+
+def is_safe_working_hour():
+    """
+    Returns True if current time is Mon-Fri, between 06:00 and 17:45.
+    Returns False if it is weekend or night time.
+    """
+    now = datetime.now()
+    
+    # 1. Check Weekend (5=Saturday, 6=Sunday)
+    if now.weekday() >= 5:
+        return False
+        
+    # 2. Check Time Window (06:00 to 17:45)
+    # We stop at 17:45 to give the system 15 mins to save data and close Chrome
+    start_time = dtime(6, 0)
+    end_time = dtime(17, 45)
+    
+    current_time = now.time()
+    
+    if start_time <= current_time <= end_time:
+        return True
+    
     return False

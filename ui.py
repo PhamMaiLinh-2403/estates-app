@@ -136,6 +136,36 @@ def schedule_retry_if_needed():
         replace_existing=True
     )
 
+def start_fresh_week_job():
+    """
+    Runs on Monday Morning.
+    Action: Clean old CSVs, Reset State, Start Phase 1 (URLs) + Phase 2 (OH Details).
+    If time permits, it will start Phase 3 (BDS Details).
+    """
+    print("[Scheduler] Monday Morning! Starting FRESH Weekly Run...")
+    
+    # Check internet first
+    if not is_safe_working_hour():
+        print("[Scheduler] Internet/Time unsafe. Skipping start.")
+        return
+
+    # Phase "full" in run_pipeline_safe handles cleanup + URLs + Details
+    # Because we updated CircuitBreaker, it will automatically stop at 17:45
+    run_phase_wrapper(resume=False, phase="full")
+
+def resume_daily_job():
+    """
+    Runs Tue-Fri Morning.
+    Action: Resume whatever is pending.
+    """
+    print("[Scheduler] Daily Resume! Continuing pending tasks...")
+    
+    if not is_safe_working_hour():
+        print("[Scheduler] Internet/Time unsafe. Skipping start.")
+        return
+
+    run_phase_wrapper(resume=True, phase="full")
+
 def acquire_scheduler_lock():
     """
     Try to bind to a specific port. 
@@ -151,6 +181,31 @@ def acquire_scheduler_lock():
     except socket.error:
         return False
     
+def internet_monitor_job():
+    """
+    Checks internet status and logs it to a file.
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    is_connected, message = check_internet_connection()
+    
+    status = "ONLINE" if is_connected else "OFFLINE"
+    log_entry = f"[{timestamp}] STATUS: {status} | Details: {message}\n"
+    
+    # Define log path
+    log_path = OUTPUT_DIR / "internet_monitor.log"
+    
+    # Append to file
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(log_entry)
+            
+        # Optional: Print to console so you see it if you are looking at the terminal
+        if not is_connected:
+            print(f"Internet is DOWN at {timestamp}")
+            
+    except Exception as e:
+        print(f"Failed to write log: {e}")
+
 
 # 2. SCHEDULER AND RECORVERY DETECTION SETUP 
 
@@ -173,18 +228,30 @@ def check_pipeline_recovery():
 
 def start_scheduler():
     if not acquire_scheduler_lock():
-        print("[System] Scheduler Lock Failed: Another instance is already running the scheduler.")
         return
-    
-    print("[System] Scheduler Lock Acquired. Starting Background Scheduler...")
-    check_pipeline_recovery()
-    
-    # Add jobs
+
+    # 1. Monday Job: Start Fresh at 08:00
     scheduler.add_job(
-        weekly_pipeline_job,
-        CronTrigger(day_of_week='wed', hour=15, minute=0),
-        id="weekly_scrape"
-    )   
+        start_fresh_week_job,
+        CronTrigger(day_of_week='mon', hour=8, minute=15),
+        id="monday_fresh_start"
+    )
+
+    # 2. Tue-Fri Job: Resume at 08:00
+    scheduler.add_job(
+        resume_daily_job,
+        CronTrigger(day_of_week='tue,wed,thu,fri', hour=8, minute=0),
+        id="daily_resume"
+    )
+
+    # 3. Monitor (Optional, keep if you want logs)
+    scheduler.add_job(
+        internet_monitor_job,
+        trigger='interval', 
+        minutes=60, 
+        id='net_monitor'
+    )
+    
     scheduler.start()
 
 start_scheduler()
