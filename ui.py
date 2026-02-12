@@ -233,7 +233,7 @@ def start_scheduler():
     # 1. Monday Job: Start Fresh at 08:00
     scheduler.add_job(
         start_fresh_week_job,
-        CronTrigger(day_of_week='mon', hour=8, minute=15),
+        CronTrigger(day_of_week='mon', hour=8, minute=10),
         id="monday_fresh_start"
     )
 

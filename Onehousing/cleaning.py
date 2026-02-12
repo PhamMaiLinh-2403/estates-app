@@ -245,15 +245,24 @@ class OneHousingDataCleaner:
         total_floors += float(basement.group(1)) if basement else 0.0
 
         if total_floors == 1:
-            return 6275876
+            return 6_000_000
 
-        if basement and float(basement.group(1)) > 0:
-            return 9504604
+        if float(floor.group(1)) > 1 and basement and float(basement.group(1)) > 0:
+            return  11_000_000
 
-        if total_floors > 1:
-            return 8221171
+        if total_floors > 1 and float(basement.group(1)) == 0:
+            return 9_500_000
         
         return np.nan
+    
+    @staticmethod
+    def _extract_unit_price(row):
+        text = str(row.get("listing_title", "")).lower()
+
+        # Nếu bài đăng bán đất nền, sử dụng công thức: Đơn giá đất = Giá ước tính / Diện tích đất
+        # Nếu bài đăng bán nhà, sử dụng công thức: Lấy giá đất chia cho giá xây dựng ước tính
+        # Giá xây dựng = Đơn giá xây dựng * Tổng diện tích sàn * Chất lượng còn lại
+        # Đơn giá đất = Giá ước tính - Giá xây dựng
 
     @staticmethod
     def clean_onehousing_data(df: pd.DataFrame) -> pd.DataFrame:
