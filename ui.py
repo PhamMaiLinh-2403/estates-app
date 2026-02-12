@@ -281,11 +281,11 @@ async def submit(
     end_time: datetime = Form(...),
     # request_name: str = Form(...)
 ):
-    if scrape_state["running"]:
-        return RedirectResponse(
-            url="/system-busy",
-            status_code=303 # Forces POST to GET
-        )
+    # if scrape_state["running"]:
+    #     return RedirectResponse(
+    #         url="/system-busy",
+    #         status_code=303 # Forces POST to GET
+    #     )
     start_time_display = start_time.strftime("%d/%m/%Y")
     end_time_display = end_time.strftime("%d/%m/%Y")
 

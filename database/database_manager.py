@@ -126,5 +126,6 @@ class DatabaseManager:
 
         return_df = pd.DataFrame(rows, columns=[column[0] for column in cursor.description])
         return_df.drop_duplicates(subset=dup, inplace=True)
+        return_df.replace(' ', np.nan, inplace=True)
         
         return return_df

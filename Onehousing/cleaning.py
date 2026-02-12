@@ -249,10 +249,10 @@ class OneHousingDataCleaner:
         if total_floors == 1:
             return 6_000_000
 
-        if float(floor.group(1)) > 1 and basement and float(basement.group(1)) > 0:
+        if floor is not None and basement is not None and float(floor.group(1)) > 1 and float(basement.group(1)) > 0:
             return  11_000_000
 
-        if total_floors > 1 and float(basement.group(1)) == 0:
+        if total_floors > 1 and basement is not None and float(basement.group(1)) == 0:
             return 9_500_000
         
         return 4_000_000 

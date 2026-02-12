@@ -91,6 +91,10 @@ def clean():
         print(f'Finished cleaning Onehousing data at {datetime.now()}!')
 
         df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
+        start_time = time.time()
+        df_cleaned.fillna(' ', axis=1, inplace=True)
+        end_time = time.time()
+        print(f'Finished filling NaN in {end_time - start_time} seconds.')
         
         if not df_cleaned.empty:
             df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
