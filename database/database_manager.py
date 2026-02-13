@@ -48,6 +48,7 @@ class DatabaseManager:
         if table_name == 'onehousing_raw' and clean_raw_func is not None:
             df = clean_raw_func(df)
         cols = list(df.columns)
+        df.fillna('nanval', inplace=True)
         placeholders = ",".join(["?"] * (len(cols)))
         quoted_cols = ",".join(f'"{col}"' for col in cols)
 
@@ -126,6 +127,6 @@ class DatabaseManager:
 
         return_df = pd.DataFrame(rows, columns=[column[0] for column in cursor.description])
         return_df.drop_duplicates(subset=dup, inplace=True)
-        return_df.replace(' ', np.nan, inplace=True)
+        return_df.replace('nanval', np.nan, inplace=True)
         
         return return_df

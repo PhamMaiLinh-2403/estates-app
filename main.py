@@ -92,7 +92,7 @@ def clean():
 
         df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
         start_time = time.time()
-        df_cleaned.fillna(' ', axis=1, inplace=True)
+        df_cleaned.fillna('nanval', axis=1, inplace=True)
         end_time = time.time()
         print(f'Finished filling NaN in {end_time - start_time} seconds.')
         
