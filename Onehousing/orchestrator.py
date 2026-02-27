@@ -200,6 +200,10 @@ def clean_raw(raw_df):
     raw_df['city'] = raw_df['city'].fillna(extracted_city)
     raw_df['district'] = raw_df['district'].fillna(extracted_district)
 
+    # Áp dụng strip() cho cột city, district
+    raw_df['city'] = raw_df['city'].str.strip()
+    raw_df['district'] = raw_df['district'].str.strip()
+
     # Dropna nếu dòng có giá trị NULL trong các cột bắt buộc
     raw_df.dropna(subset=['listing_title', 'total_price', 'city', 'district'], inplace=True)
 
