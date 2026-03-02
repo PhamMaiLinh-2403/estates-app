@@ -7,14 +7,15 @@ import time
 import psutil 
 import socket 
 from datetime import datetime, time as dtime
-from selenium.common.exceptions import WebDriverException
 
 
 def build_page_url(search_page_url, page_number):
     """Constructs urls for pagination."""
     if page_number == 1:
         return search_page_url
+    
     base_search_url = search_page_url.rstrip('/')
+
     return f"{base_search_url}/p{page_number}"
 
 
@@ -22,9 +23,11 @@ def chunks(iterable, n):
     """Split iterable into n roughly equal chunks."""
     lst = list(iterable)
     k, m = divmod(len(lst), n)
+
     for i in range(n):
         start = i * k + min(i, m)
         end = (i + 1) * k + min(i + 1, m)
+
         yield lst[start:end]
 
 def kill_system_chrome_processes():
@@ -32,6 +35,7 @@ def kill_system_chrome_processes():
     Forcefully kills all chrome and chromedriver processes on the system.
     """
     system_platform = platform.system()
+
     try:
         if system_platform == "Windows":
             # /F = Force, /IM = Image Name, /T = Kill child processes too
@@ -41,16 +45,20 @@ def kill_system_chrome_processes():
             # Linux/MacOS
             os.system("pkill -f chrome > /dev/null 2>&1")
             os.system("pkill -f chromedriver > /dev/null 2>&1")
-            
+
         print("Executed global Chrome cleanup.")
+
     except Exception as e:
         print(f"Warning: Could not run cleanup command: {e}")
 
 def clean_scraper_temp_dirs():
+    """
+    Clean all temporary user directories from former runs. 
+    """
     tmp_dir = tempfile.gettempdir()
     targets = glob.glob(os.path.join(tmp_dir, "bds_scraper_*")) # Find folders starting with bds_scraper_
-    
     count = 0
+
     for path in targets:
         try:
             shutil.rmtree(path, ignore_errors=True)
@@ -58,11 +66,11 @@ def clean_scraper_temp_dirs():
         except Exception:
             pass
 
-    print(f"[System] Cleaned {count} temporary browser profiles.")
+    print(f"Cleaned {count} temporary browser profiles.")
 
-def safe_driver_quit(driver, user_data_dir=None):
+def safe_driver_quit(driver):
     """
-    Aggressively quits the driver. If graceful quit hangs, it forces a kill on the PID.
+    Quits the driver. If graceful quit hangs, it forces a kill on the PID.
     """
     if not driver:
         return
@@ -83,7 +91,7 @@ def safe_driver_quit(driver, user_data_dir=None):
     except Exception:
         pass
 
-    # 3. Double Tap: Force Kill the Process ID if it still exists
+    # 3. Force Kill the Process ID if it still exists
     if driver_pid:
         try:
             if psutil.pid_exists(driver_pid):
@@ -96,19 +104,15 @@ def safe_driver_quit(driver, user_data_dir=None):
                         pass
                 # Kill parent (browser)
                 proc.kill()
-                print(f"[System] Force killed stuck driver PID: {driver_pid}")
+                print(f"Force killed stuck driver PID: {driver_pid}")
         except (psutil.NoSuchProcess, Exception):
             pass
 
     # 4. Cleanup Temp Dir
-    if user_data_dir and os.path.exists(user_data_dir):
-        try:
-            import shutil
-            # Wait a tiny bit for file locks to release, then delete
-            time.sleep(0.1) 
-            shutil.rmtree(user_data_dir, ignore_errors=True)
-        except Exception:
-            pass
+    try:
+        clean_scraper_temp_dirs()
+    except Exception:
+        pass
 
 def check_internet_connection(host="8.8.8.8", port=53, timeout=5):
     """
@@ -126,11 +130,12 @@ def wait_for_internet(max_retries=10, wait_seconds=30):
     """
     Blocks execution until internet is available or retries are exhausted.
     """
-    print("Checking internet connectivity...")
     for i in range(max_retries):
+
         if check_internet_connection():
             print("Internet connection confirmed.")
             return True
+        
         print(f"No internet. Retrying in {wait_seconds}s ({i+1}/{max_retries})...")
         time.sleep(wait_seconds)
     

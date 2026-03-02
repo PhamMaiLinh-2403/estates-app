@@ -39,31 +39,20 @@ scheduler = BackgroundScheduler(timezone="Asia/Ho_Chi_Minh")
 
 # 1. JOB WRAPPERS 
 
-def weekly_pipeline_job():
-    """
-    CRON TRIGGER: Friday 21:00
-    Intent: NEW RUN.
-    Action: Cleanup old files, start fresh.
-    """
-    print("[Scheduler] Starting Weekly Run - Phase 1: URLs Collection...")
-    run_phase_wrapper(resume=False, phase="urls")
-
 def phase_2_job():
     """
-    DELAYED TRIGGER: 30 mins after Phase 1
-    Intent: START PHASE 2 (Details).
-    Action: Resume (keep URL files), scrape details, clean.
+    Trigger 30 mins after Phase 1. 
+    Action: Scrape details and clean.
     """
-    print("[Scheduler] Starting Weekly Run - Phase 2: Details Collection...")
+    print("Starting Phase 2: Details Collection...")
     # Trigger Phase 2 (Must be resume=True to read the URLs collected in Phase 1)
     run_phase_wrapper(resume=True, phase="details")
 
 def retry_pipeline_job():
     """
-    RETRY TRIGGER: Error or Auto-Recovery
-    Action: Try to run everything remaining.
+    Action: Resume pipeline after error or interruption. 
     """
-    print("[Scheduler] Starting Retry/Resume Run (Full Recovery)...")
+    print("Starting Retry/Resume Run...")
     run_phase_wrapper(resume=True, phase="full")
 
 def run_phase_wrapper(resume, phase):
@@ -80,7 +69,6 @@ def run_phase_wrapper(resume, phase):
         scrape_state["last_run"] = datetime.now().isoformat()
 
     try:
-        # Call the updated function in main.py
         success, reason = run_pipeline_safe(resume=resume, target_phase=phase)
         
         if success:
@@ -89,7 +77,7 @@ def run_phase_wrapper(resume, phase):
             if phase == "urls":
                 # Calculate 30 minutes from now
                 run_time = datetime.now() + timedelta(minutes=30)
-                print(f"[System] Phase 1 done. Scheduling Phase 2 for {run_time.strftime('%H:%M:%S')} (30 min rest)")
+                print(f"Phase 1 done. Scheduling Phase 2 for {run_time.strftime('%H:%M:%S')} (30 min rest)")
                 
                 # Schedule the next job
                 scheduler.add_job(
@@ -99,7 +87,6 @@ def run_phase_wrapper(resume, phase):
                 )
             
             elif phase == "details" or phase == "full":
-                # If we finished details, we are actually done-done.
                 PipelineStateManager().reset()
                 scrape_state["message"] = "Weekly Pipeline Fully Completed"
 
@@ -121,13 +108,13 @@ def schedule_retry_if_needed():
     current_retries = sm.increment_retry()
     
     if current_retries > 3:
-        print("[System] Max retries (3) reached. Manual intervention required.")
+        print("Max retries (3) reached. Manual intervention required.")
         scrape_state["message"] = "Failed (Max Retries Reached)"
         return
 
     # Retry in 1 hour
     run_time = datetime.now() + timedelta(hours=1)
-    print(f"[System] Scheduling retry #{current_retries} for {run_time.strftime('%H:%M:%S')}")
+    print(f"Scheduling retry #{current_retries} for {run_time.strftime('%H:%M:%S')}")
     
     scheduler.add_job(
         retry_pipeline_job, 
@@ -139,18 +126,13 @@ def schedule_retry_if_needed():
 def start_fresh_week_job():
     """
     Runs on Monday Morning.
-    Action: Clean old CSVs, Reset State, Start Phase 1 (URLs) + Phase 2 (OH Details).
-    If time permits, it will start Phase 3 (BDS Details).
+    Action: Clean old CSVs, Reset State, Start Scraping Data. 
     """
-    print("[Scheduler] Monday Morning! Starting FRESH Weekly Run...")
-    
     # Check internet first
     if not is_safe_working_hour():
-        print("[Scheduler] Internet/Time unsafe. Skipping start.")
+        print("Internet/Time unsafe. Skipping start.")
         return
 
-    # Phase "full" in run_pipeline_safe handles cleanup + URLs + Details
-    # Because we updated CircuitBreaker, it will automatically stop at 17:45
     run_phase_wrapper(resume=False, phase="full")
 
 def resume_daily_job():
@@ -158,10 +140,10 @@ def resume_daily_job():
     Runs Tue-Fri Morning.
     Action: Resume whatever is pending.
     """
-    print("[Scheduler] Daily Resume! Continuing pending tasks...")
+    print("Daily Resume! Continuing pending tasks...")
     
     if not is_safe_working_hour():
-        print("[Scheduler] Internet/Time unsafe. Skipping start.")
+        print("Internet/Time unsafe. Skipping start.")
         return
 
     run_phase_wrapper(resume=True, phase="full")
@@ -180,31 +162,6 @@ def acquire_scheduler_lock():
         return True
     except socket.error:
         return False
-    
-def internet_monitor_job():
-    """
-    Checks internet status and logs it to a file.
-    """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    is_connected, message = check_internet_connection()
-    
-    status = "ONLINE" if is_connected else "OFFLINE"
-    log_entry = f"[{timestamp}] STATUS: {status} | Details: {message}\n"
-    
-    # Define log path
-    log_path = OUTPUT_DIR / "internet_monitor.log"
-    
-    # Append to file
-    try:
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(log_entry)
-            
-        # Optional: Print to console so you see it if you are looking at the terminal
-        if not is_connected:
-            print(f"Internet is DOWN at {timestamp}")
-            
-    except Exception as e:
-        print(f"Failed to write log: {e}")
 
 
 # 2. SCHEDULER AND RECORVERY DETECTION SETUP 
@@ -217,7 +174,7 @@ def check_pipeline_recovery():
     """
     sm = PipelineStateManager()
     if sm.is_suspended():
-        print("[System] Detected suspended pipeline state. Auto-rescheduling resume...")
+        print("Detected suspended pipeline state. Auto-rescheduling resume...")
         # Schedule a resume in 1 minute to allow server to fully boot
         run_time = datetime.now() + timedelta(minutes=1)
         scheduler.add_job(
@@ -242,14 +199,6 @@ def start_scheduler():
         resume_daily_job,
         CronTrigger(day_of_week='tue,wed,thu,fri', hour=8, minute=0),
         id="daily_resume"
-    )
-
-    # 3. Monitor (Optional, keep if you want logs)
-    scheduler.add_job(
-        internet_monitor_job,
-        trigger='interval', 
-        minutes=60, 
-        id='net_monitor'
     )
     
     scheduler.start()
