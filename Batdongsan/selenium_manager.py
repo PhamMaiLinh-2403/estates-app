@@ -71,13 +71,17 @@ def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
                     cb.record_success()
                     sm.mark_page_complete("Batdongsan", page)
                     print(f"[Worker {worker_id}] Page {page}: Found {len(new_urls)}")
+
                 else:
                     print(f"[Worker {worker_id}] Page {page}: No URLs found")
+
             except (ConnectionRefusedError, MemoryError) as e:
                 cb.record_failure(str(e))
                 break
+
             except Exception as e:
                 cb.record_failure(str(e))
+
     finally:
         safe_driver_quit(driver, user_data_dir)
 
@@ -105,6 +109,7 @@ def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
                 if data:
                     data_queue.put(data)
                     circuit_breaker.record_success()
+
                 else:
                     circuit_breaker.record_failure("ItemFailed3Times")
                     print(f"[Worker {worker_id}] Failed item {url}")
@@ -112,6 +117,7 @@ def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
             except (ConnectionRefusedError, MemoryError) as e:
                 circuit_breaker.record_failure(str(e))
                 break
+            
             except Exception as e:
                 circuit_breaker.record_failure(str(e))
             

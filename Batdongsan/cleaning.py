@@ -13,7 +13,7 @@ class DataCleaner:
     Static methods for cleaning and standardizing scraped data.
     """
 
-    # -- Helper methods --
+    # === Helper methods ===
     @staticmethod
     def _parse_and_clean_number(text_value):
         """
@@ -77,7 +77,7 @@ class DataCleaner:
 
         return cleaned
     
-    # -- Static Cleaning Methods -- 
+    # === Static Cleaning Methods ===
     @staticmethod
     def extract_city(row):
         try:
@@ -121,17 +121,21 @@ class DataCleaner:
 
         if pd.notna(short_address) and isinstance(short_address, str):
             parts = [p.strip() for p in short_address.split(",")]
+
             for part in parts:
                 if part.lower().startswith(("phường ", "xã ", "thị trấn ")):
                     return part
 
         try:
             address_list = json.loads(row["address_parts"])
+
             if address_list:
                 last_item = address_list[-1]
                 match = re.search(r"tại\s+((?:phường|xã|thị trấn)\s+[\w\s\d\-()]+)", last_item, re.IGNORECASE)
+
                 if match:
                     return match.group(1).title().strip()
+                
         except (json.JSONDecodeError, TypeError, KeyError, IndexError):
             pass
 
@@ -144,8 +148,10 @@ class DataCleaner:
 
         if short_address:
             parts = [p.strip() for p in short_address.split(",")]
+
             for part in parts:
                 match = re.search(r'\b(đường|phố|quốc lộ|đại lộ|xa lộ|tỉnh lộ)\s+[\w\s\-()\/]+', part.lower())
+
                 if match and len(match.group(0).split()) <= 5:
                     return match.group(0).title().strip()
 
@@ -154,11 +160,14 @@ class DataCleaner:
         if parts_raw:
             try:
                 addr_list = json.loads(parts_raw)
+
                 if addr_list:
                     last_item = addr_list[-1]
                     m = re.search(r"tại (đường|phố|quốc lộ|đại lộ|xa lộ|tỉnh lộ)\s+([^,]+)", last_item, re.IGNORECASE)
+
                     if m and len(m.group(0).split()) <= 5:
                         return f"{m.group(1).capitalize()} {m.group(2).strip()}"
+                    
             except (json.JSONDecodeError, ValueError, SyntaxError):
                 pass
 
@@ -166,6 +175,7 @@ class DataCleaner:
         
         if title:
             m = re.search(r"(đường|phố|quốc lộ|đại lộ|xa lộ)\s+([\w\s\d\-]+?)(?:,|$|\s-|\s--|\()", title, re.IGNORECASE)
+            
             if m and len(m.group(0).split()) <= 5:
                 street_cap = " ".join(w.capitalize() for w in m.group(2).strip().split())
                 return f"{m.group(1).capitalize()} {street_cap}"
@@ -218,10 +228,13 @@ class DataCleaner:
         if pd.notna(row.get("main_info")):
             try:
                 for item in json.loads(row["main_info"]):
+
                     if item.get("title") == "Diện tích":
                         area = DataCleaner._parse_and_clean_number(item.get("value"))
+
                         if pd.notna(area):
                             return area
+                        
             except json.JSONDecodeError:
                 pass
 
@@ -229,8 +242,10 @@ class DataCleaner:
             try:
                 area_val = json.loads(row["other_info"]).get("Diện tích")
                 area = DataCleaner._parse_and_clean_number(area_val)
+
                 if pd.notna(area):
                     return area
+                
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -251,19 +266,23 @@ class DataCleaner:
                     for idx in [0, 1]:
                         item = info_items[idx]
                         title = item.get("title", "").strip().lower()
+
                         if "giá" in title:
                             price_str = item.get("value")
                             break
+
             except (json.JSONDecodeError, IndexError, TypeError):
                 pass
 
         if not price_str and pd.notna(row.get("other_info")): 
             try:
                 other_data = json.loads(row["other_info"])
+
                 for key, value in other_data.items():
                     if isinstance(key, str) and "giá" in key.lower():
                         price_str = value
                         break
+
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -280,8 +299,9 @@ class DataCleaner:
         except ValueError:
             return np.nan
 
-        # Extract unit price
+        # Trích xuất đơn vị: tỷ/triệu VNĐ, triệu/m²...
         unit_match = re.search(r'\d[\d\.,]*\s*([^\d\s]+(?:/[^\d\s]+)?)', price_str)
+
         if not unit_match:
             return np.nan
         unit = unit_match.group(1)
@@ -313,30 +333,37 @@ class DataCleaner:
             for item in json.loads(main_info_json):
                 if item.get("title") == "Ngày đăng":
                     return item.get("value")
+                
         except (json.JSONDecodeError, TypeError):
             pass
+
         return None
     
     @staticmethod
     def extract_num_floors(row):
         cleaned_text = (str(row.get('title') or '') + DataCleaner.clean_description_text(str(row.get('description') or '')).lower().strip())
 
-        # --- TH1: Extract from other_info ---
+        # Extract data from other_info
         other_info = row.get("other_info", "")
+
         if isinstance(other_info, str):
             try:
                 other_info = json.loads(other_info)
                 ele = other_info.get("Số tầng")
+
                 if ele is not None:
                     return int(re.search(r"\d+", ele).group())
+                
             except Exception:
                 pass
+
         if isinstance(other_info, dict) and other_info.get("Số tầng"):
             return int(other_info["Số tầng"].split()[0])
 
-        # --- TH2: Nhà cũ/nát hoặc nhà cấp 4 ---
+        # Nhà cũ/nát hoặc nhà cấp 4 => default 1 
         if re.search(r"nhà (?:\w+\s*){0,3}(?:cũ|nát)", cleaned_text):
             return 1
+        
         if re.search(r'nhà cấp 4|nhà c4|cấp 4|nc4', cleaned_text):
             return 1
     
@@ -349,13 +376,16 @@ class DataCleaner:
                 m = re.search(r"\d+", str(val))
                 if m:
                     return int(m.group(0))
+                
         except (json.JSONDecodeError, TypeError):
             pass
 
         text = f"{row.get('title', '')} {row.get('description', '')}".lower().strip()
+
         for pattern, val in FACADE_COUNT_MAP:
             if re.search(pattern, text):
                 return val
+            
         return 1
 
     @staticmethod
@@ -368,6 +398,7 @@ class DataCleaner:
                 if re.search(r'\b' + re.escape(kw) + r'\b', text):
                     if not DataCleaner._is_negated(text, kw):
                         return shape
+                    
         return "Chữ nhật"
     
     @staticmethod
@@ -383,20 +414,26 @@ class DataCleaner:
                 pattern = pattern.strip()
                 # pattern = '\W' + pattern + '\W'
                 qual = re.search(pattern, text)
+
                 if qual:
                     return quality_val
+                
         else:
             return default_quality
         
     @staticmethod
     def extract_construction_cost(row):
         def check_basement(text):
+            # Tránh những trường hợp như: nhà có giấy phép xây dựng hầm, nhà có thể cải tạo thêm hầm, nhà gần hầm chui... 
+            # Chỉ trích xuất những trường hợp nhà thật sự có hầm 
             string = re.findall(pattern=r'(?:(?!được xây|giấy phép xây dựng|gpxd|cải tạo)\b\w+\b\W+){1,7}hầm(?:(?!\schui)\W+\b\w+\b){1,7}', string=text)
+
             if string:
                 for substr in string:
                     basement = re.search(pattern=r'tầng|lầu|tấm|mê|\d+|xe|kết cấu|kc|ô tô|thang máy|trệt|lửng', string=substr)
                     if basement:
                         return True
+                    
             return False
         
         text = f"{row.get('title', '')}. {row.get('description', '')}".lower().strip()
@@ -413,11 +450,12 @@ class DataCleaner:
                     return 4_000_000
             if re.search(pattern = r'nhà cấp 4|nhà c4|cấp 4\W|nc4|nhà nát|c4', string=text):
                 return 4_000_000
+            
             # Nhà 1 tầng
             if row['Số tầng công trình'] == 1:
                 return 6_275_876
         
-            # Tìm biệt thự/villa trong title (thường là chính xác)
+            # Tìm biệt thự/villa trong title 
             if isinstance(title, str) and pd.notnull(title):
                 # Biệt thự có hầm
                 if check_basement(title) and (re.search(r'biệt thự', title) or re.search(r'villa\W', title)):
@@ -434,10 +472,13 @@ class DataCleaner:
                         r'bán (?:(?!mua|xây)\S+\s+){0,3}(?:biệt thự|villa\W)', # Bán biệt thự
                         r'(?:biệt thự|villa\W)\s*(?:\S+\s+){0,3}\d+\s*tầng' # Biệt thự bao nhiêu tầng
                     ]
+
                     for pattern in villa_pattern:
                         if re.search(pattern, description):
+
                             if check_basement(description):
                                 return 12_848_184 # Biệt thự có hầm
+                            
                             return 10_510_920 # Biệt thự không hầm
 
                 # Nhà bê tông cốt thép
@@ -446,26 +487,34 @@ class DataCleaner:
                         return 6_275_876 # Nhà 1 tầng 1 hầm
                     else:
                         return 8_221_171 # Nhà 2 tầng không hầm
+                    
                 elif row['Số tầng công trình'] < 2:
                     return 6_275_876 
+                
                 else:
                     if check_basement(description):
                         return 9_504_604 # Nhà hơn 2 tầng, có hầm
+                    
                     return 8_221_171 # Nhà hơn 2 tầng, không hầm
             
             if row['Số tầng công trình'] < 2:
                 return 6_275_876 # Nhà 1 tầng 1 hầm
+            
             else:   
                 if check_basement(text):
                     if row['Số tầng công trình'] == 2:
                         return 9_504_604 # Nhà 2 tầng có hầm
+                    
                     else:
                         return 9_504_604 # Nhà từ 2 tầng có hầm
+                    
                 else:                 
                     return 8_221_171 # Nhà 2 tầng không hầm
+                
         else:
             if row['Số tầng công trình'] < 2:
                 return 6_275_876 # Nhà 1 tầng bê tông cốt thép
+            
             else:
                 return 8_221_171 # Nhà 2 tầng bê tông cốt thép không có hầm (do không có mà check)
 
@@ -474,8 +523,10 @@ class DataCleaner:
         if pd.notna(row.get("other_info", "{}")):
                 try:
                     width = json.loads(row["other_info"]).get("Mặt tiền")
+
                     if pd.notna(width):
                         return DataCleaner._parse_and_clean_number(width)
+                    
                 except (json.JSONDecodeError, TypeError):
                     pass
 
@@ -489,6 +540,7 @@ class DataCleaner:
                 return float(match.group(2).replace(',', '.'))
 
             m = re.search(r"\(?\s*(\d+[.,]?\d*)\s*[x×]\s*(\d+[.,]?\d*)\s*\)?\s*(m|mét)?\b", text, re.IGNORECASE)
+
             if m:
                 num1 = float(m.group(1).replace(',', '.'))
                 num2 = float(m.group(2).replace(',', '.'))
@@ -526,6 +578,7 @@ class DataCleaner:
 
         if "đất trồng" in text and "nhà" in text:
             return "Đất hỗn hợp"
+        
         return "Đất ở"
         
     @staticmethod
@@ -625,26 +678,32 @@ class DataCleaner:
     @staticmethod
     def extract_distance_to_the_main_road(row):
         val = None
+
         try:
             other_info = row.get("other_info")
+
             if other_info:
                 other_info_dict = json.loads(other_info)
                 val = other_info_dict.get("Đường vào")
+
         except (json.JSONDecodeError, TypeError, AttributeError):
             val = None
 
         # Try to parse val to number (meters)
         num_val = None
+
         if val is not None:
             try:
                 # Remove spaces and units, replace comma with dot
                 val_str = str(val).lower().replace(" ", "").replace(",", ".")
+
                 if val_str.endswith("km"):
                     num_val = float(val_str.replace("km", "")) * 1000
                 elif val_str.endswith("m"):
                     num_val = float(val_str.replace("m", ""))
                 else:
                     num_val = float(val_str)
+
             except ValueError:
                 num_val = None
 
@@ -652,6 +711,7 @@ class DataCleaner:
 
         if num_val is not None and num_val >= 50:
             return num_val
+        
         elif pd.notna(text):
             # TH1: Nhà nằm trên mặt phố 
             if DataCleaner.extract_street_or_alley_front(row) == "Mặt phố":
@@ -831,11 +891,11 @@ class DataCleaner:
         short_add = str(row.get("short_address", "")).strip()
         pho = DataCleaner.search_pho(string, short_add)
 
-        #------ TH1: Hẻm xe hơi, hẻm xe tải và sẹc ------
+        # TH1: Hẻm xe hơi, hẻm xe tải và sẹc
         if re.search(r'hxh|hxt|sẹc|sẹt|xẹc|xẹt| sec ', string):
             return 'Mặt ngõ'
         
-        #------ TH2: Ngách ------
+        # TH2: Ngách 
         result = re.findall(r'(?:\S+\s+){0,5}(\S+\sngách)\s*(?:\S+\s+){0,5}', string)
         if result != []:
             for i in result:
@@ -845,7 +905,7 @@ class DataCleaner:
                     return 'Mặt ngõ'
                 return 'Mặt ngõ'
             
-        #------ TH3: Kiệt ------
+        # TH3: Kiệt 
         kiet = re.findall(r'(?:\S+\s){0,3}kiệt(?:\s\S+){0,2}', string)
         if len(kiet) > 0:
             for k in kiet:
@@ -856,15 +916,15 @@ class DataCleaner:
                         break 
                     return 'Mặt ngõ'
         
-        #------ TH4: Hẻm ------
+        # TH4: Hẻm
         if re.search(r'(?<!như)(?<!hơn)(?:\S+\s){0,2}(?:hẻm|\Whem\W)',string):
             return 'Mặt ngõ'
         
-        #------ TH5: Các trường hợp drop define từ search_pho ------
+        # TH5: Các trường hợp drop define từ search_pho 
         if pho == 'Drop':
             return None
         
-        #------ TH6: Ngõ ------
+        # TH6: Ngõ 
         ngo = re.findall(r'(?:(?<!hơn\s)(?<!như\s)(?<!giá\s)(?:\S+\s*){1,3})ngõ', string)
         cua_ngo = re.search(r'(?<!đỗ\s)(?:cửa ngõ|cưa ngõ|một mặt ngõ|1 mặt ngõ|một ngõ|1 ngõ)', string)
 
@@ -898,8 +958,9 @@ class DataCleaner:
 
 
 class DataImputer:
-    _graph_cache = {}
-
+    """
+    Class to impute missing data after extracting and cleaning.
+    """
     @staticmethod
     def fill_missing_width(df: pd.DataFrame) -> pd.DataFrame:
         """
