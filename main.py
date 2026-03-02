@@ -26,24 +26,22 @@ from Onehousing.orchestrator import (
 def cleanup_intermediate_files():
     """
     Deletes existing CSV files to prevent file bloat and data mixing 
-    before a new run. Preserves the SQLite database.
+    before a new run. Only preserves the SQLite database through runs.
     """
     print("Cleaning up old CSV files...")
     
     # Collect all CSV paths from config
     files_to_delete = []
     
-    # Add URL CSVs
     if isinstance(URLS_CSV_PATH, dict):
         files_to_delete.extend(URLS_CSV_PATH.values())
     
-    # Add Details CSVs
     if isinstance(DETAILS_CSV_PATH, dict):
         files_to_delete.extend(DETAILS_CSV_PATH.values())
         
-    # Add Final Cleaned CSV
     files_to_delete.append(CLEANED_CSV_PATH)
     
+    # Delete all existing CSV files 
     for file_path in files_to_delete:
         try:
             if file_path.exists():
@@ -53,42 +51,44 @@ def cleanup_intermediate_files():
             print(f"Warning: Could not delete {file_path}. Reason: {e}")
 
 def clean():
+    """
+    Clean data, then add raw data and cleaned data to the database. 
+    """
+    # Create a SQLite database if it hasn't existed 
     if not os.path.exists(DATABASE_DIR):
         DatabaseManager.create_db() 
 
-    # Add raw data (Ignore duplicates handled by SQL)
+    # Add raw data (Logic to handle duplicates already included)
     try:
         if DETAILS_CSV_PATH['Batdongsan'].exists():
-            print(f'Adding raw Batdongsan data to the database at {datetime.now()}...')
             DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
-            print(f'Finished adding raw data of Batdongsan at {datetime.now()}!')
+            print(f'Finished adding raw data of Batdongsan!')
 
         if DETAILS_CSV_PATH['Onehousing'].exists():
-            print(f'Adding raw Onehousing data to the database at {datetime.now()}...')
             DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw", clean_raw)
-            print(f'Finished adding raw data of Onehousing at {datetime.now()}!')
+            print(f'Finished adding raw data of Onehousing!')
 
     except Exception as e:
         print(f"Error syncing raw data: {e}")
 
     # Clean data
     try:
-        print(f'Cleaning Batdongsan data at {datetime.now()}...')
+        print(f'Cleaning Batdongsan data...')
         df_bds_clean = process_batdongsan_data()
 
         if not df_bds_clean.empty:
             df_bds_clean['Web'] = 'Batdongsan'
 
-        print(f'Finished cleaning Batdongsan data at {datetime.now()}!')
+        print(f'Finished cleaning Batdongsan data!')
 
         print(f'Cleaning Onehousing data at {datetime.now()}...')
         df_oh_clean = process_onehousing_data()
         
         if not df_oh_clean.empty:
             df_oh_clean['Web'] = 'Onehousing'
-            df_oh_clean['Thời điểm giao dịch/rao bán'] = '20/01/2026' # datetime.now().strftime("%d/%m/%Y")
+            df_oh_clean['Thời điểm giao dịch/rao bán'] = datetime.now().strftime("%d/%m/%Y")
             
-        print(f'Finished cleaning Onehousing data at {datetime.now()}!')
+        print(f'Finished cleaning Onehousing data!')
 
         df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
         start_time = time.time()
@@ -96,67 +96,17 @@ def clean():
         end_time = time.time()
         print(f'Finished filling NaN in {end_time - start_time} seconds.')
         
+        # Add cleaned data
         if not df_cleaned.empty:
             df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
             DatabaseManager.add_row_to_table(CLEANED_CSV_PATH, "cleaned")
-            print(f"Finished adding data to the database at {datetime.now()}!")
+            print(f"Finished adding data to the database!")
         else:
             print("No cleaned data produced.")
             
     except Exception as e:
         print(f"Cleaning error: {e}")
         traceback.print_exc()
-
-def clean_test():
-    if not os.path.exists(DATABASE_DIR):
-        DatabaseManager.create_db() 
-
-    # Add raw data (Ignore duplicates handled by SQL)
-    try:
-        if DETAILS_CSV_PATH['Batdongsan'].exists():
-            print(f'Adding raw Batdongsan data to the database at {datetime.now()}...')
-            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Batdongsan'], "bds_raw")
-            print(f'Finished adding raw data of Batdongsan at {datetime.now()}!')
-
-        if DETAILS_CSV_PATH['Onehousing'].exists():
-            print(f'Adding raw Onehousing data to the database at {datetime.now()}...')
-            DatabaseManager.add_row_to_table(DETAILS_CSV_PATH['Onehousing'], "onehousing_raw", clean_raw)
-            print(f'Finished adding raw data of Onehousing at {datetime.now()}!')
-
-    except Exception as e:
-        print(f"Error syncing raw data: {e}")
-
-    # Clean data
-    # try:
-    #     print(f'Cleaning Batdongsan data at {datetime.now()}...')
-    #     df_bds_clean = process_batdongsan_data()
-
-    #     if not df_bds_clean.empty:
-    #         df_bds_clean['Web'] = 'Batdongsan'
-
-    #     print(f'Finished cleaning Batdongsan data at {datetime.now()}!')
-
-    #     print(f'Cleaning Onehousing data at {datetime.now()}...')
-    #     df_oh_clean = process_onehousing_data()
-        
-    #     if not df_oh_clean.empty:
-    #         df_oh_clean['Web'] = 'Onehousing'
-    #         df_oh_clean['Thời điểm giao dịch/rao bán'] = '20/01/2026' # datetime.now().strftime("%d/%m/%Y")
-            
-    #     print(f'Finished cleaning Onehousing data at {datetime.now()}!')
-
-    #     df_cleaned = pd.concat([df_bds_clean, df_oh_clean], axis=0)
-        
-    #     if not df_cleaned.empty:
-    #         df_cleaned.to_csv(CLEANED_CSV_PATH, index=False)
-    #         DatabaseManager.add_row_to_table(CLEANED_CSV_PATH, "cleaned")
-    #         print(f"Finished adding data to the database at {datetime.now()}!")
-    #     else:
-    #         print("No cleaned data produced.")
-            
-    # except Exception as e:
-    #     print(f"Cleaning error: {e}")
-    #     traceback.print_exc()
 
 def run_pipeline_safe(resume=False, target_phase="full"):
     """
@@ -172,7 +122,7 @@ def run_pipeline_safe(resume=False, target_phase="full"):
     circuit_breaker = CircuitBreaker() 
 
     if not resume and target_phase in ["full", "urls"]:
-        print("Starting New Pipeline Run (Cleanup initiated)...")
+        print("Starting New Pipeline Run...")
         cleanup_intermediate_files()    # Only clean up old files on a new run 
         state_manager.reset_for_new_run()
     else:
@@ -215,8 +165,9 @@ def run_pipeline_safe(resume=False, target_phase="full"):
         
         return True, "Completed"
 
-    except PipelineStopException as e:
-        print(f"\nPipeline Stopped: {e}")
+    except Exception as e:
+        print(f"\nUnexpected Error: {e}")
+        traceback.print_exc()
         print("Attempting to process and save partial data to DB...")
 
         try:
@@ -224,21 +175,6 @@ def run_pipeline_safe(resume=False, target_phase="full"):
             print("Partial data saved successfully.")
         except Exception as clean_err:
             print(f"Warning: Failed to save partial data: {clean_err}")
-
-        kill_system_chrome_processes()
-        state_manager.set_suspended()
-        return False, str(e)
-
-    except Exception as e:
-        print(f"\nUnexpected Error: {e}")
-        traceback.print_exc()
-        print("[System] Attempting to process and save partial data to DB...")
-
-        try:
-            clean()
-            print("[System] Partial data saved successfully.")
-        except Exception as clean_err:
-            print(f"[System] Warning: Failed to save partial data: {clean_err}")
 
         kill_system_chrome_processes()
         state_manager.set_suspended()

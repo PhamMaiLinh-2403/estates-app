@@ -2,6 +2,10 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
+
 from io import BytesIO
 import uuid
 import pandas as pd
@@ -11,10 +15,6 @@ import socket
 from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings("ignore")
-
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.date import DateTrigger
 
 from commons.config import *
 from commons.state_manager import PipelineStateManager
@@ -190,7 +190,7 @@ def start_scheduler():
     # 1. Monday Job: Start Fresh at 08:00
     scheduler.add_job(
         start_fresh_week_job,
-        CronTrigger(day_of_week='mon', hour=8, minute=10),
+        CronTrigger(day_of_week='mon', hour=8, minute=40),
         id="monday_fresh_start"
     )
 
