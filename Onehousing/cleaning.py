@@ -87,7 +87,7 @@ class OneHousingDataCleaner:
         if pd.isna(title):
             return ""
 
-        if "cách" in str(title).lower():
+        if "cách" in str(title).lower() or "mặt ngõ" in str(title).lower():
             return "Mặt ngõ"
 
         return "Mặt phố"

@@ -83,7 +83,7 @@ def scrape_urls_worker(worker_id, url, pages, q, cb, sm):
                 cb.record_failure(str(e))
 
     finally:
-        safe_driver_quit(driver, user_data_dir)
+        safe_driver_quit(driver)
 
 def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
     """Worker to scrape listing details."""
@@ -128,4 +128,4 @@ def scrape_details_worker(worker_id, url_subset, data_queue, circuit_breaker):
     except Exception as e:
         print(f"[Worker {worker_id}] Fatal: {e}")
     finally:
-        safe_driver_quit(driver, user_data_dir)
+        safe_driver_quit(driver)

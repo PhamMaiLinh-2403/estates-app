@@ -180,7 +180,7 @@ def onehousing_detail_worker(worker_id: int, urls: List[str], data_queue: queue.
     except Exception as e:
         print(f"[Worker {worker_id}] Fatal: {e}")
     finally:
-        safe_driver_quit(driver, user_data_dir)
+        safe_driver_quit(driver)
 
 def clean_raw(raw_df):
     # Bỏ các cột null property_url và listing_title 
