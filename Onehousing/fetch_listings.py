@@ -1,5 +1,6 @@
 import json
 import re
+from bs4 import BeautifulSoup
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -17,7 +18,7 @@ def extract_listing_details(driver, url):
         def safe_text(by, selector):
             try:
                 return wait.until(EC.presence_of_element_located((by, selector))).text.strip()
-            except (TimeoutException, NoSuchElementException):
+            except (TimeoutException, NoSuchElementException, Exception):
                 return None
         
         data = {
@@ -90,6 +91,7 @@ def extract_listing_details(driver, url):
             pass
 
         # Extract description
+        # Đối với nhà đất và đất nền 
         try:
             title_meta = driver.find_element(
                 By.CSS_SELECTOR,
@@ -109,17 +111,43 @@ def extract_listing_details(driver, url):
                     .filter(Boolean);
             """)
 
-            full_description = " ".join(
-                [title_meta, description_meta] + li_texts
-            )
+            parts = [title_meta, description_meta] + li_texts
+            full_description = " ".join([p for p in parts if p])
             full_description = re.sub(r"\s+", " ", full_description).strip()
 
-            data["property_description"] = full_description
-
         except Exception:
-            pass
+            full_description = None 
+
+        # Fallback đối với nhà liền kề, biệt thự, villa 
+        if not full_description:
+            try:
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+
+                container = soup.select_one("div.max-h-\\[70px\\].overflow-hidden")
+
+                if not container:
+                    return None
+
+                html = str(container)
+
+                # Convert block tags thành newline
+                html = re.sub(r'<br\s*/?>', '\n', html)
+                html = re.sub(r'</p>|</div>|</li>', '\n', html)
+
+                # Remove tất cả HTML tags
+                text = re.sub(r'<[^>]+>', '', html)
+
+                # Clean spacing
+                text = re.sub(r'\n+', '\n', text)
+                text = re.sub(r'[ \t]+', ' ', text)
+
+                full_description = text
+
+            except Exception:
+                pass 
         
         data["features"] = "; ".join(data["features"])
+        data["property_description"] = full_description
         data["property_description"] = "".join(data["property_description"])
         
         return data
