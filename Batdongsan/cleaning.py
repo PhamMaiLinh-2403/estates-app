@@ -594,6 +594,20 @@ class DataCleaner:
             return round(float(m.group(1).replace(",", ".")), 2)
         elif m2 in text:
             return round(float(m2.group(1).replace(",", ".")), 2)
+        
+        # Tìm từ khóa diện tích xây dựng
+        dtxd = [r'(?:dtxd|dt xây dựng|diện tích xd|diện tích xây dựng) *\D{0,6}\ *(\d+(?: *[.,m] *\d+)?) *m? *(?:x|\*) *(\d+(?: *[.,m] *\d+)?) *m?', r'(?:dtxd|dt xây dựng|diện tích xd|diện tích xây dựng) *\D{0,6} *(\d+(?: *[.,] *\d+)?) *(?:m|/)']
+        for pat in dtxd:
+            ca = re.search(pat, text)
+            if ca:
+                try:
+                    result = float(ca.group(1).replace(',', '.').replace('m', '.')) * float(ca.group(2).replace(',', '.').replace('m', '.'))
+                    if result <= 2000:
+                        return result 
+                except:
+                    result = float(ca.group(1).replace(',', '.').replace('m', '.'))
+                    if result <= 2000:
+                        return result
 
         # Trong trường hợp không tìm được diện tích thổ cư/đất ở cụ thể trong bài, mặc định diện tích xây dựng = diện tích đất
         kws = ["full thổ cư", "thổ cư 100%", "thổ cư hoàn toàn", "toàn bộ thổ cư", "thổ cư toàn bộ"]
@@ -632,7 +646,15 @@ class DataCleaner:
             r"(?i)(\d+(?:[.,]\d+)?)\s*m[²2](?:\s+\S+){0,5}?\s+dtsd",
         ]
 
-        for pattern in patterns:
+        pattern_new = [
+            r'(?:diện ?tích ?sàn|dt sàn|dts|dtsxd)(?:\s\S+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
+            r'sàn(?: xây dựng| xd)?(?:\s\S+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
+            r'(\d+(?: *[.,] *\d+)?) *(?:m|m2|m²) *(?:sàn|diện tích sàn|dts|dt sàn|dtsxd)',
+            r'(?:diện ?tích ?sử ?dụng|dtsd|dt sử dụng|diện tích sd)(?:\s\S+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
+            r'(\d+(?: *[.,] *\d+)?) *(?:m|m2|m²) *(?:diện tích sử dụng|dt sử dụng|diện tích sd|dtsd)',
+        ]
+
+        for pattern in pattern_new:
             match = re.search(pattern, text)
             if match:
                 try:
