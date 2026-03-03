@@ -61,7 +61,7 @@ def run_phase_wrapper(resume, phase):
     """
     with scrape_lock:
         if scrape_state["running"]:
-            print(f"[System] Pipeline busy. Cannot start phase: {phase}.")
+            print(f"Pipeline busy. Cannot start phase: {phase}.")
             return
         
         scrape_state["running"] = True
@@ -79,7 +79,6 @@ def run_phase_wrapper(resume, phase):
                 run_time = datetime.now() + timedelta(minutes=30)
                 print(f"Phase 1 done. Scheduling Phase 2 for {run_time.strftime('%H:%M:%S')} (30 min rest)")
                 
-                # Schedule the next job
                 scheduler.add_job(
                     phase_2_job,
                     trigger=DateTrigger(run_date=run_time),
@@ -91,9 +90,12 @@ def run_phase_wrapper(resume, phase):
                 scrape_state["message"] = "Weekly Pipeline Fully Completed"
 
         else:
-            # If failed, trigger the standard retry logic
-            scrape_state["message"] = f"Suspended: {reason}"
-            schedule_retry_if_needed()
+            if "working hours" in str(reason).lower() or "17:45" in str(reason):
+                scrape_state["message"] = f"Paused for Night: {reason}"
+                print("Pipeline paused for the night. Will resume via Morning Scheduler.")
+            else:
+                scrape_state["message"] = f"Suspended: {reason}"
+                schedule_retry_if_needed()
 
     except Exception as e:
         scrape_state["message"] = f"Failed: {e}"
@@ -104,6 +106,10 @@ def run_phase_wrapper(resume, phase):
 
 def schedule_retry_if_needed():
     """Checks retry limits and schedules next attempt."""
+    if not is_safe_working_hour():
+        print("Outside working hours. Skipping immediate retry scheduling.")
+        return
+
     sm = PipelineStateManager()
     current_retries = sm.increment_retry()
     
