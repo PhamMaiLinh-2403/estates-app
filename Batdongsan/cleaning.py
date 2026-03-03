@@ -646,27 +646,49 @@ class DataCleaner:
             r"(?i)(\d+(?:[.,]\d+)?)\s*m[²2](?:\s+\S+){0,5}?\s+dtsd",
         ]
 
+        # pattern_new = [
+        #     r'(?:diện ?tích ?sàn|dt sàn|dts|dtsxd)(?:\s\[^\d\s]+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
+        #     r'sàn(?: xây dựng| xd)?(?:\s[^\d\s]+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
+        #     r'(\d+(?: *[.,] *\d+)?) *(?:m|m2|m²) *(?:sàn|diện tích sàn|dts|dt sàn|dtsxd)',
+        #     r'(?:diện ?tích ?sử ?dụng|dtsd|dt sử dụng|diện tích sd)(?:\s[^\d\s]\D+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
+        #     r'(\d+(?: *[.,] *\d+)?) *(?:m|m2|m²) *(?:diện tích sử dụng|dt sử dụng|diện tích sd|dtsd)',
+        # ]
+
+        pattern_multiply = r'(?:diện tích sàn|dt sàn|dts|dtsxd|diện tích sàn xây dựng|diện tích sử dụng|dtsd|dt sử dụng|diện tích sd) *\D{0,20}\ *(\d+(?: *[.,m] *\d+)?) *m? *(?:x|\*) *(\d+(?: *[.,m] *\d+)?) *m?'
+
         pattern_new = [
-            r'(?:diện ?tích ?sàn|dt sàn|dts|dtsxd)(?:\s\S+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
-            r'sàn(?: xây dựng| xd)?(?:\s\S+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
-            r'(\d+(?: *[.,] *\d+)?) *(?:m|m2|m²) *(?:sàn|diện tích sàn|dts|dt sàn|dtsxd)',
-            r'(?:diện ?tích ?sử ?dụng|dtsd|dt sử dụng|diện tích sd)(?:\s\S+){0,5} ?(\d+(?: *[.,] *\d+)?) *m',
+            r'(?:diện ?tích ?sàn|dt sàn|dts|dtsxd|diện tích sàn xây dựng)\D{0,20} ?(\d+(?: *[.,] *\d+)?) *m',
+            # r'sàn(?: xây dựng| xd)?\D{0,30} ?(\d+(?: *[.,] *\d+)?) *m',
+            r'(\d+(?: *[.,] *\d+)?) *(?:m|m2|m²) *(?:diện tích sàn|dts|dt sàn|dtsxd)',
+            r'(?:diện ?tích ?sử ?dụng|dtsd|dt sử dụng|diện tích sd)\D{0,20} ?(\d+(?: *[.,] *\d+)?) *m',
             r'(\d+(?: *[.,] *\d+)?) *(?:m|m2|m²) *(?:diện tích sử dụng|dt sử dụng|diện tích sd|dtsd)',
         ]
+
+        # Cho trường hợp a x b
+        pat_mul = re.search(pattern_multiply, text)
+        try:
+            result = float(pat_mul.group(1).replace(",", ".")) * float(pat_mul.group(2).replace(",", "."))
+            if result > 10:
+                return result
+        except:
+            pass
 
         for pattern in pattern_new:
             match = re.search(pattern, text)
             if match:
                 try:
                     result = float(match.group(1).replace(",", "."))
-                    return result
+                    if result > 10:
+                        return result
                 except ValueError:
                     continue  
 
         if construction_area is not None and num_floors is not None:
             # If building area is not found in textual evidence, fallback to formula: Bulding area = Construction area x Number of floors 
-            return round(construction_area * num_floors, 2)
-
+            result = round(construction_area * num_floors, 2)
+            if result > 10:
+                return result
+        
         return None
 
     @staticmethod 
