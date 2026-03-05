@@ -164,6 +164,21 @@ def run_pipeline_safe(resume=False, target_phase="full"):
             state_manager.set_completed()
         
         return True, "Completed"
+    
+    except PipelineStopException as stop_msg:
+        print(f"\nPipeline Paused: {stop_msg}")
+        
+        state_manager.set_suspended()
+        
+        print("Saving partial data to Database before stopping...")
+        try:
+            clean()
+            print("Partial data saved successfully.")
+        except Exception as clean_err:
+            print(f"Warning: Failed to save partial data: {clean_err}")
+
+        kill_system_chrome_processes()
+        return False, str(stop_msg)
 
     except Exception as e:
         print(f"\nUnexpected Error: {e}")
