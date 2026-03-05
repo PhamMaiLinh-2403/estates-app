@@ -116,7 +116,7 @@ def extract_listing_details(driver, url):
             full_description = re.sub(r"\s+", " ", full_description).strip()
 
         except Exception:
-            full_description = None 
+            pass 
 
         # Fallback đối với nhà liền kề, biệt thự, villa 
         if not full_description:
