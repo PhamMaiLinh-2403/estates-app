@@ -45,7 +45,6 @@ def phase_2_job():
     Action: Scrape details and clean.
     """
     print("Starting Phase 2: Details Collection...")
-    # Trigger Phase 2 (Must be resume=True to read the URLs collected in Phase 1)
     run_phase_wrapper(resume=True, phase="details")
 
 def retry_pipeline_job():
@@ -75,7 +74,6 @@ def run_phase_wrapper(resume, phase):
             scrape_state["message"] = f"Phase {phase} Completed"
             
             if phase == "urls":
-                # Calculate 30 minutes from now
                 run_time = datetime.now() + timedelta(minutes=30)
                 print(f"Phase 1 done. Scheduling Phase 2 for {run_time.strftime('%H:%M:%S')} (30 min rest)")
                 
@@ -134,7 +132,6 @@ def start_fresh_week_job():
     Runs on Monday Morning.
     Action: Clean old CSVs, Reset State, Start Scraping Data. 
     """
-    # Check internet first
     if not is_safe_working_hour():
         print("Internet/Time unsafe. Skipping start.")
         return
@@ -173,21 +170,6 @@ def acquire_scheduler_lock():
 # 2. SCHEDULER AND RECORVERY DETECTION SETUP 
 
 @app.on_event("startup")
-def check_pipeline_recovery():
-    """
-    Runs on server start. 
-    Detects if the pipeline was killed (suspended) and auto-resumes.
-    """
-    sm = PipelineStateManager()
-    if sm.is_suspended():
-        print("Detected suspended pipeline state. Auto-rescheduling resume...")
-        # Schedule a resume in 1 minute to allow server to fully boot
-        run_time = datetime.now() + timedelta(minutes=1)
-        scheduler.add_job(
-            retry_pipeline_job,
-            trigger=DateTrigger(run_date=run_time),
-            id=f"auto_resume_{int(datetime.now().timestamp())}"
-        )
 
 def start_scheduler():
     if not acquire_scheduler_lock():
@@ -196,7 +178,7 @@ def start_scheduler():
     # 1. Monday Job: Start Fresh at 08:00
     scheduler.add_job(
         start_fresh_week_job,
-        CronTrigger(day_of_week='mon', hour=8, minute=40),
+        CronTrigger(day_of_week='mon', hour=8, minute=15),
         id="monday_fresh_start"
     )
 
@@ -259,10 +241,8 @@ async def submit(
             "web": web,
             "start_time": start_time_display,
             "end_time": end_time_display,
-            # "request_name": request_name,
             "result_text": result_text,
             "job_id": job_id
-            # "scraped_data": df
         }
     )
 
