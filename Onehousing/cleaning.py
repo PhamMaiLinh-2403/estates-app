@@ -264,6 +264,8 @@ class OneHousingDataCleaner:
 
         if "đất nền" in title:
             return ""
+        elif "liền kề" in title or "biệt thự" in title or "shophouse" in title:
+            
         
         return 0.85
 
