@@ -185,6 +185,39 @@ class OneHousingDataCleaner:
                     pass
 
         return np.nan
+    
+    @staticmethod
+    def _extract_building_area(row):
+        title = str(row.get("listing_title", "")).lower().strip()
+        text = str(row.get("property_description", "")).lower().strip()
+
+        pattern = r"diện tích xây dựng\s+(\d+(?:\.\d+)?)\s*m²"
+
+        if match:= re.search(pattern, text, re.IGNORECASE):
+            try:
+                return float(match.group(1))
+            except (ValueError):
+                pass 
+
+        else:
+            land_area = OneHousingDataCleaner._extract_land_area(row)
+            num_floors = OneHousingDataCleaner._extract_number_of_floors(row)
+
+            if land_area and num_floors: 
+            
+                if "biệt thự" in title:
+                    construction_area = 0.56 * land_area
+                elif "liền kề" in title or "shophouse" in title:
+                    if land_area > 90:
+                        construction_area = 0.85 * land_area
+                    else:
+                        construction_area = land_area
+                else:
+                    construction_area = land_area
+
+                return construction_area * num_floors 
+            
+        return np.nan 
 
     @staticmethod
     def _extract_distance_to_main_road(row):
@@ -227,15 +260,19 @@ class OneHousingDataCleaner:
     def _estimate_remaining_quality(row):
         """Estimate remaining quality of construction."""
         title = str(row.get("listing_title", "")).lower()
+        features = str(row.get("features", "")).lower().strip()
 
         if "đất nền" in title:
             return ""
+        
         return 0.85
 
     @staticmethod
     def _estimate_construction_price(row):
         """Estimate construction price per sqm."""
+        title = str(row.get("listing_title", "")).lower().strip()
         text = str(row.get("features", "")) + " " + str(row.get("property_description", ""))
+
         floor = re.search(r"Số tầng:\s*(\d+(?:\.\d+)?)", text, re.IGNORECASE)
         basement = re.search(r"Số tầng hầm:\s*(\d+(?:\.\d+)?)", text, re.IGNORECASE)
         total_floors = 0.0
@@ -283,6 +320,7 @@ class OneHousingDataCleaner:
         floors = df.apply(OneHousingDataCleaner._extract_number_of_floors, axis=1)
         num_frontages = df.apply(OneHousingDataCleaner._extract_number_of_frontages, axis=1)
         area = df.apply(OneHousingDataCleaner._extract_land_area, axis=1)
+        building_area = df.apply(OneHousingDataCleaner._extract_building_area, axis=1)
         front_width = df.apply(OneHousingDataCleaner._extract_front_width, axis=1)
         remaining_quality = df.apply(OneHousingDataCleaner._estimate_remaining_quality, axis=1)
         construction_price = df.apply(OneHousingDataCleaner._estimate_construction_price, axis=1)
@@ -290,8 +328,6 @@ class OneHousingDataCleaner:
         longitude = df["longitude"]
 
         with np.errstate(divide='ignore', invalid='ignore'):
-            floors_for_calc = floors.fillna(1.0)
-            total_area = round((floors_for_calc * area).replace([np.inf, -np.inf], np.nan), 2)
             length = round((area / front_width).replace([np.inf, -np.inf], np.nan), 2)
 
         cleaned_df = pd.DataFrame({
@@ -310,7 +346,7 @@ class OneHousingDataCleaner:
             "Đơn giá đất": "",
             "Lợi thế kinh doanh": "",
             "Số tầng công trình": floors,
-            "Tổng diện tích sàn": total_area,
+            "Tổng diện tích sàn": building_area,
             "Đơn giá xây dựng": construction_price,
             "Năm xây dựng": np.nan,
             "Chất lượng còn lại": remaining_quality,
